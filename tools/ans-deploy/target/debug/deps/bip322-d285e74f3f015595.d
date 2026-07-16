@@ -1,0 +1,11 @@
+/Users/brianhoffman/Projects/arch-name-service/tools/ans-deploy/target/debug/deps/bip322-d285e74f3f015595.d: /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/lib.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/error.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/sign.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/util.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/verify.rs
+
+/Users/brianhoffman/Projects/arch-name-service/tools/ans-deploy/target/debug/deps/libbip322-d285e74f3f015595.rlib: /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/lib.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/error.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/sign.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/util.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/verify.rs
+
+/Users/brianhoffman/Projects/arch-name-service/tools/ans-deploy/target/debug/deps/libbip322-d285e74f3f015595.rmeta: /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/lib.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/error.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/sign.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/util.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/verify.rs
+
+/Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/lib.rs:
+/Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/error.rs:
+/Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/sign.rs:
+/Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/util.rs:
+/Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/bip322-0.0.9/src/verify.rs:

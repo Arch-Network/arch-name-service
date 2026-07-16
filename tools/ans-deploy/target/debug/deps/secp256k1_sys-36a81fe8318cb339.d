@@ -1,0 +1,10 @@
+/Users/brianhoffman/Projects/arch-name-service/tools/ans-deploy/target/debug/deps/secp256k1_sys-36a81fe8318cb339.d: /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/lib.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/macros.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/types.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/recovery.rs
+
+/Users/brianhoffman/Projects/arch-name-service/tools/ans-deploy/target/debug/deps/libsecp256k1_sys-36a81fe8318cb339.rlib: /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/lib.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/macros.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/types.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/recovery.rs
+
+/Users/brianhoffman/Projects/arch-name-service/tools/ans-deploy/target/debug/deps/libsecp256k1_sys-36a81fe8318cb339.rmeta: /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/lib.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/macros.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/types.rs /Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/recovery.rs
+
+/Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/lib.rs:
+/Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/macros.rs:
+/Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/types.rs:
+/Users/brianhoffman/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/secp256k1-sys-0.10.1/src/recovery.rs:

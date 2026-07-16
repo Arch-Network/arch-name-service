@@ -24,6 +24,7 @@ fn config() -> RegistryConfig {
         program_version: 1,
         network_id: 31337,
         namespace: ".arch".to_owned(),
+        namespace_authority: [8; 32],
         grace_period_slots: 50,
         min_registration_slots: 10,
         max_registration_slots: 100_000,
