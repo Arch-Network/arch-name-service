@@ -28,4 +28,11 @@ The implementation contract is specified in [docs/PROTOCOL.md](docs/PROTOCOL.md)
 
 ## Status
 
-Protocol specification phase. No production deployment, token, or mainnet launch is implied by this repository.
+Protocol foundations are implemented in the Rust `ans-protocol` crate:
+deterministic PDA derivation, Borsh state/instruction codecs, typed-record
+validation, and a reference resolver that validates supplied Arch account
+state. See [the testnet resolution milestone](docs/TESTNET_RESOLUTION_MILESTONE.md).
+
+The registry program, testnet deployment, and centralized resolver service are
+intentionally not included. No production deployment, token, or mainnet launch
+is implied by this repository.
