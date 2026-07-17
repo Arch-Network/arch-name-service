@@ -24,12 +24,51 @@ for in-place upgrades. The program derives addresses from its runtime program
 id, so there is deliberately no compiled-in program id and no program-id sync
 script.
 
+### Local key bootstrap
+
+Generate the three fresh testnet-only keys locally:
+
+```bash
+./scripts/bootstrap-testnet-keys.sh
+```
+
+The script writes private key files and `bootstrap.env` to the gitignored
+`.ans-testnet-keys/` directory with owner-only permissions. It never prints
+private key material. It validates the Arch SDK key format with the local
+deploy tool and displays only the role-to-public-ID mapping; no transaction or
+deployment is sent.
+
+Use `--key-dir /secure/path` to choose another directory. A directory inside
+this repository must be gitignored; an external directory is also accepted.
+The script refuses unsafe destinations and existing bootstrap files unless
+`--force` is supplied.
+
+After reviewing the public IDs in `.ans-testnet-keys/deployment-manifest.json`,
+explicitly upload the prepared values to GitHub:
+
+```bash
+./scripts/bootstrap-testnet-keys.sh --apply-github-secrets
+```
+
+This requires an authenticated `gh` session with permission to set Environment
+secrets. It sets `PROGRAM_KEYPAIR_B64`, `DEPLOYER_KEYPAIR_B64`, and
+`NAMESPACE_AUTHORITY_KEYPAIR_B64` in the `testnet` Environment only. It does
+not trigger this repository's deployment workflow.
+
+Keep the directory out of sync folders, email, chat, and source control. Make
+an encrypted offline backup of the whole key directory, store its decryption
+credential separately in an approved secret manager, and retain the deployer
+and program keys for upgrades. Anyone with a copied key can act as that role.
+
 ## First deployment
 
-1. Generate and custody the three testnet keypairs out of band. Record public
-   keys and fund the deployer with enough testnet balance for the SBF upload.
-2. Base64 encode each complete keypair file without line wrapping, then add the
-   three required secrets to the `testnet` Environment.
+1. Generate and custody the three testnet keypairs with the local bootstrap
+   script. Record the public IDs and fund the deployer with enough testnet
+   balance for the SBF upload.
+2. Upload the three prepared secrets with
+   `./scripts/bootstrap-testnet-keys.sh --apply-github-secrets`, or manually
+   base64 encode each complete keypair file without line wrapping and add the
+   required secrets to the `testnet` Environment.
 3. In Actions, run `ans-testnet-deploy` with `operation=deploy` and
    `dry_run=true`. Verify the printed program id, deployer, namespace authority,
    RPC URL, and uploaded `deployments/testnet.json` artifact.
