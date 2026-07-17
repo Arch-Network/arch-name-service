@@ -37,6 +37,7 @@ struct PayerStatus {
     present: bool,
     system_owned: bool,
     lamports: Option<u64>,
+    required_lamports: u64,
     suitable: bool,
 }
 
@@ -48,6 +49,9 @@ struct TransactionRecord {
 
 const TESTNET_NETWORK_ID: u32 = 2;
 const TESTNET_NAMESPACE: &str = ".arch";
+const FAUCET_AIRDROP_LAMPORTS: u64 = 1_000_000;
+const MIN_DEPLOYER_LAMPORTS: u64 = 5 * FAUCET_AIRDROP_LAMPORTS;
+const MIN_NAMESPACE_AUTHORITY_LAMPORTS: u64 = FAUCET_AIRDROP_LAMPORTS;
 
 fn main() -> Result<()> {
     let (action, dry_run) = parse_args()?;
@@ -74,8 +78,12 @@ fn main() -> Result<()> {
         TESTNET_NETWORK_ID,
         TESTNET_NAMESPACE,
     ));
-    let deployer_payer = payer_status(&client, deployer);
-    let namespace_authority_payer = payer_status(&client, namespace_authority);
+    let deployer_payer = payer_status(&client, deployer, MIN_DEPLOYER_LAMPORTS);
+    let namespace_authority_payer = payer_status(
+        &client,
+        namespace_authority,
+        MIN_NAMESPACE_AUTHORITY_LAMPORTS,
+    );
     let program_deployed = client
         .read_account_info(program_id)
         .map(|account| account.is_executable)
@@ -115,16 +123,22 @@ fn main() -> Result<()> {
             if dry_run {
                 println!("DRY RUN: no faucet request sent.");
             } else {
-                client
-                    .create_and_fund_account_with_faucet(&deployer_keypair)
-                    .context("fund deployer payer with testnet faucet")?;
+                for _ in 0..5 {
+                    client
+                        .create_and_fund_account_with_faucet(&deployer_keypair)
+                        .context("fund deployer payer with testnet faucet")?;
+                }
                 client
                     .create_and_fund_account_with_faucet(&namespace_authority_keypair(
                         &authority_path,
                     )?)
                     .context("fund namespace authority payer with testnet faucet")?;
-                deployment.deployer_payer = payer_status(&client, deployer);
-                deployment.namespace_authority_payer = payer_status(&client, namespace_authority);
+                deployment.deployer_payer = payer_status(&client, deployer, MIN_DEPLOYER_LAMPORTS);
+                deployment.namespace_authority_payer = payer_status(
+                    &client,
+                    namespace_authority,
+                    MIN_NAMESPACE_AUTHORITY_LAMPORTS,
+                );
                 require_deploy_payer(&deployment.deployer_payer)?;
                 require_namespace_authority_payer(&deployment.namespace_authority_payer)?;
                 fs::write(&output_path, serde_json::to_vec_pretty(&deployment)?)?;
@@ -221,13 +235,13 @@ fn config(rpc_url: String) -> Config {
         node_endpoint: String::new(),
         node_username: String::new(),
         node_password: String::new(),
-        network: Network::Testnet,
+        network: Network::Testnet4,
         arch_node_url: rpc_url,
         titan_url: String::new(),
     }
 }
 
-fn payer_status(client: &ArchRpcClient, payer: Pubkey) -> PayerStatus {
+fn payer_status(client: &ArchRpcClient, payer: Pubkey, required_lamports: u64) -> PayerStatus {
     match client.read_account_info(payer) {
         Ok(account) => {
             let system_owned = account.owner == Pubkey::system_program();
@@ -235,13 +249,15 @@ fn payer_status(client: &ArchRpcClient, payer: Pubkey) -> PayerStatus {
                 present: true,
                 system_owned,
                 lamports: Some(account.lamports),
-                suitable: system_owned && account.lamports > 0,
+                required_lamports,
+                suitable: system_owned && account.lamports >= required_lamports,
             }
         }
         Err(_) => PayerStatus {
             present: false,
             system_owned: false,
             lamports: None,
+            required_lamports,
             suitable: false,
         },
     }
@@ -252,7 +268,8 @@ fn require_deploy_payer(status: &PayerStatus) -> Result<()> {
         Ok(())
     } else {
         bail!(
-            "deployer payer is unsuitable: it must be present, system-owned, and funded; run `ans-deploy fund`, then `ans-deploy preflight`"
+            "deployer payer is unsuitable: it must be present, system-owned, and hold at least {} lamports; run `ans-deploy fund`, then `ans-deploy preflight`",
+            status.required_lamports
         )
     }
 }
@@ -262,7 +279,8 @@ fn require_namespace_authority_payer(status: &PayerStatus) -> Result<()> {
         Ok(())
     } else {
         bail!(
-            "namespace authority payer is unsuitable: it must be present, system-owned, and funded; run `ans-deploy fund`, then `ans-deploy preflight`"
+            "namespace authority payer is unsuitable: it must be present, system-owned, and hold at least {} lamports; run `ans-deploy fund`, then `ans-deploy preflight`",
+            status.required_lamports
         )
     }
 }

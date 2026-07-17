@@ -77,8 +77,11 @@ and program keys for upgrades. Anyone with a copied key can act as that role.
    with `present=false`, `system_owned=false`, or `suitable=false` must not be
    used for a deployment or initialization.
 4. Run `operation=fund` with `dry_run=false` to create/fund the two testnet
-   payer accounts through the Arch SDK faucet. Then re-run `operation=preflight`
-   and require both payer `suitable` fields to be true before continuing.
+   payer accounts through the Arch SDK faucet. It requests five 1,000,000
+   lamport rounds for the deployer (the same large-ELF heuristic used by
+   Autara) and one round for the namespace authority. Then re-run
+   `operation=preflight` and require both payer `suitable` fields to be true
+   before continuing.
 5. Run `operation=deploy` with `dry_run=false`. The workflow builds
    `programs/ans-registry` with `cargo-build-sbf` and uploads it through the
    Arch SDK. The deployer is the SDK authority and fee payer; no distinct payer
