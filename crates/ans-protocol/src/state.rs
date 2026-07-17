@@ -57,6 +57,9 @@ pub struct RegistryConfig {
     pub program_version: u16,
     pub network_id: u32,
     pub namespace: String,
+    /// Testnet-only authority that initializes the dedicated `.arch` namespace.
+    /// It has no per-name authority and cannot transfer or mutate registrations.
+    pub namespace_authority: ArchAddress,
     pub grace_period_slots: u64,
     pub min_registration_slots: u64,
     pub max_registration_slots: u64,

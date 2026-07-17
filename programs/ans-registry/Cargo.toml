@@ -1,0 +1,18 @@
+[package]
+name = "ans-registry"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Testnet registry program for Arch Name Service"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+entrypoint = []
+
+[dependencies]
+ans-protocol = { path = "../../crates/ans-protocol" }
+arch_program = "=0.6.2"
+borsh = { version = "=1.5.3", features = ["derive"] }

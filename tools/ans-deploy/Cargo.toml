@@ -1,0 +1,20 @@
+[package]
+name = "ans-deploy"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/Arch-Network/arch-name-service"
+description = "Deploys the ANS registry program to Arch testnet"
+
+[[bin]]
+name = "ans-deploy"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.93"
+arch_program = "=0.6.2"
+arch_sdk = "=0.6.2"
+serde = { version = "1.0.214", features = ["derive"] }
+serde_json = "1.0.132"
+
+[workspace]

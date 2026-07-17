@@ -1,0 +1,96 @@
+name: ans-testnet-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Deploy a new program or upgrade the existing program key"
+        type: choice
+        required: true
+        default: deploy
+        options: [deploy, upgrade]
+      dry_run:
+        description: "Print the deployment manifest without sending transactions"
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ans-testnet-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: testnet
+    env:
+      NETWORK: testnet
+      DRY_RUN: ${{ inputs.dry_run }}
+      CI_ARCH_RPC_URL: ${{ secrets.ARCH_RPC_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Decode testnet keypairs
+        env:
+          PROGRAM_KEYPAIR_B64: ${{ secrets.PROGRAM_KEYPAIR_B64 }}
+          DEPLOYER_KEYPAIR_B64: ${{ secrets.DEPLOYER_KEYPAIR_B64 }}
+          NAMESPACE_AUTHORITY_KEYPAIR_B64: ${{ secrets.NAMESPACE_AUTHORITY_KEYPAIR_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          KEYS="$RUNNER_TEMP/ans-keys"
+          mkdir -p "$KEYS"
+          for secret in PROGRAM_KEYPAIR_B64 DEPLOYER_KEYPAIR_B64 NAMESPACE_AUTHORITY_KEYPAIR_B64; do
+            if [ -z "${!secret:-}" ]; then
+              echo "::error::Missing $secret on the testnet GitHub Environment." >&2
+              exit 1
+            fi
+          done
+          printf '%s' "$PROGRAM_KEYPAIR_B64" | base64 -d > "$KEYS/program.json"
+          printf '%s' "$DEPLOYER_KEYPAIR_B64" | base64 -d > "$KEYS/deployer.json"
+          printf '%s' "$NAMESPACE_AUTHORITY_KEYPAIR_B64" | base64 -d > "$KEYS/namespace-authority.json"
+          {
+            echo "PROGRAM_KEY_PATH=$KEYS/program.json"
+            echo "DEPLOYER_KEY_PATH=$KEYS/deployer.json"
+            echo "NAMESPACE_AUTHORITY_KEY_PATH=$KEYS/namespace-authority.json"
+            echo "ARCH_RPC_URL=${CI_ARCH_RPC_URL:-https://rpc.testnet.arch.network}"
+          } >> "$GITHUB_ENV"
+
+      - name: Build deploy tool
+        run: cargo build --locked -q --manifest-path tools/ans-deploy/Cargo.toml
+
+      - name: Build SBF program
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          set -euo pipefail
+          curl -sSfL https://release.anza.xyz/stable/install | sh
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          cd programs/ans-registry
+          cargo-build-sbf --features entrypoint
+          test -f ../../target/deploy/ans_registry.so
+
+      - name: Deploy or upgrade ANS registry
+        run: |
+          set -euo pipefail
+          mkdir -p deployments
+          if [ "$DRY_RUN" = "true" ]; then
+            tools/ans-deploy/target/debug/ans-deploy --dry-run
+          else
+            tools/ans-deploy/target/debug/ans-deploy
+          fi
+
+      - name: Upload deployment manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ans-${{ inputs.operation }}-testnet
+          path: deployments/testnet.json
+          if-no-files-found: warn

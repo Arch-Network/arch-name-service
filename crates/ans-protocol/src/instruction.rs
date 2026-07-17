@@ -7,6 +7,12 @@ use crate::state::{ArchAddress, RecordType, RecordValue};
 /// not by this portable codec crate.
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub enum NameInstruction {
+    /// Initializes the one testnet `.arch` registry configuration. The
+    /// namespace authority is dedicated to this initialization only.
+    InitializeRegistry {
+        network_id: u32,
+        namespace_authority: ArchAddress,
+    },
     Register {
         label: String,
         duration_slots: u64,
