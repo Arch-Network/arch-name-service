@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: "Deploy a new program or upgrade the existing program key"
+        description: "Inspect, fund payer accounts, deploy/upgrade, or initialize the registry"
         type: choice
         required: true
-        default: deploy
-        options: [deploy, upgrade]
+        default: preflight
+        options: [preflight, fund, deploy, upgrade, initialize]
       dry_run:
         description: "Print the deployment manifest without sending transactions"
         type: boolean
@@ -67,7 +67,7 @@ jobs:
         run: cargo build --locked -q --manifest-path tools/ans-deploy/Cargo.toml
 
       - name: Build SBF program
-        if: ${{ inputs.dry_run == false }}
+        if: ${{ inputs.dry_run == false && (inputs.operation == 'deploy' || inputs.operation == 'upgrade') }}
         run: |
           set -euo pipefail
           curl -sSfL https://release.anza.xyz/stable/install | sh
@@ -84,14 +84,26 @@ jobs:
           cargo-build-sbf --features entrypoint
           test -f ../../target/deploy/ans_registry.so
 
-      - name: Deploy or upgrade ANS registry
+      - name: Run ANS testnet operation
         run: |
           set -euo pipefail
           mkdir -p deployments
+          case "${{ inputs.operation }}" in
+            preflight|fund|initialize)
+              ACTION="${{ inputs.operation }}"
+              ;;
+            deploy|upgrade)
+              ACTION="deploy"
+              ;;
+            *)
+              echo "::error::unsupported operation" >&2
+              exit 2
+              ;;
+          esac
           if [ "$DRY_RUN" = "true" ]; then
-            tools/ans-deploy/target/debug/ans-deploy --dry-run
+            tools/ans-deploy/target/debug/ans-deploy "$ACTION" --dry-run
           else
-            tools/ans-deploy/target/debug/ans-deploy
+            tools/ans-deploy/target/debug/ans-deploy "$ACTION"
           fi
 
       - name: Upload deployment manifest
