@@ -1,3 +1,9 @@
 /target/
 /tools/ans-deploy/target/
 /.ans-testnet-keys/
+/packages/ans-sdk/node_modules/
+/packages/ans-sdk/dist/
+/apps/ans-manager/node_modules/
+/apps/ans-manager/dist/
+/infra/cdk/node_modules/
+/infra/cdk/cdk.out/
