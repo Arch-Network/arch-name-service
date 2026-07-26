@@ -12,10 +12,13 @@ base64-encoded keypair files:
 
 - `PROGRAM_KEYPAIR_B64` — persistent program key; its public key is the ANS
   program id.
-- `DEPLOYER_KEYPAIR_B64` — funded deployment and upgrade authority.
+- `DEPLOYER_KEYPAIR_B64` — deployment and upgrade authority. Before deployment,
+  it must be an on-chain, system-owned, funded account because Arch SDK
+  `ProgramDeployer` uses this key as the transaction fee payer.
 - `NAMESPACE_AUTHORITY_KEYPAIR_B64` — dedicated temporary authority that signs
-  the one-time registry initialization instruction. It has no authority over
-  registered names.
+  the one-time registry initialization instruction and pays that transaction's
+  fee. It too must be an on-chain, system-owned, funded account. It has no
+  authority over registered names.
 - `ARCH_RPC_URL` — optional testnet RPC override. It defaults to
   `https://rpc.testnet.arch.network`.
 
@@ -63,23 +66,35 @@ and program keys for upgrades. Anyone with a copied key can act as that role.
 ## First deployment
 
 1. Generate and custody the three testnet keypairs with the local bootstrap
-   script. Record the public IDs and fund the deployer with enough testnet
-   balance for the SBF upload.
+   script. Record the public IDs.
 2. Upload the three prepared secrets with
    `./scripts/bootstrap-testnet-keys.sh --apply-github-secrets`, or manually
    base64 encode each complete keypair file without line wrapping and add the
    required secrets to the `testnet` Environment.
-3. In Actions, run `ans-testnet-deploy` with `operation=deploy` and
+3. In Actions, run `ans-testnet-deploy` with `operation=preflight` and
    `dry_run=true`. Verify the printed program id, deployer, namespace authority,
-   RPC URL, and uploaded `deployments/testnet.json` artifact.
-4. Re-run with `dry_run=false`. The workflow builds
+   RPC URL, config address, and payer fields. A deployer or namespace authority
+   with `present=false`, `system_owned=false`, or `suitable=false` must not be
+   used for a deployment or initialization.
+4. Run `operation=fund` with `dry_run=false` to create/fund the two testnet
+   payer accounts through the Arch SDK faucet. It requests five 1,000,000
+   lamport rounds for the deployer (the same large-ELF heuristic used by
+   Autara) and one round for the namespace authority. Then re-run
+   `operation=preflight` and require both payer `suitable` fields to be true
+   before continuing.
+5. Run `operation=deploy` with `dry_run=false`. The workflow builds
    `programs/ans-registry` with `cargo-build-sbf` and uploads it through the
-   Arch SDK. It does not register names or send any transaction in dry-run mode.
-5. Initialize the registry with the dedicated namespace authority using the
-   `InitializeRegistry { network_id: 2, namespace_authority }` instruction and
-   the derived config account. This is a one-time state transition; confirm the
-   resulting config declares `.arch`, `BitcoinNetwork::Testnet`, and no expiry.
-6. Exercise the instruction tests against testnet before announcing the
+   Arch SDK. The deployer is the SDK authority and fee payer; no distinct payer
+   can be supplied to `ProgramDeployer`.
+6. Run `operation=initialize` with `dry_run=false`. This constructs and signs
+   `InitializeRegistry { network_id: 2, namespace_authority }` with the
+   namespace authority as both signer and fee payer. It derives the config
+   account, skips the transaction when an exact expected config already exists,
+   and verifies `.arch`, `BitcoinNetwork::Testnet`, zero expiry policy, and the
+   configured authority after a successful transaction. The artifact records
+   the config address, initialization state, payer evidence, and initialization
+   transaction id.
+7. Exercise the instruction tests against testnet before announcing the
    namespace: register a name, write an `ARCH_OWNER` record, set primary,
    transfer, and confirm the old record and reverse binding no longer resolve.
 
@@ -89,9 +104,9 @@ For a local preflight, supply filesystem paths rather than secrets:
 PROGRAM_KEY_PATH=/secure/program.json \
 DEPLOYER_KEY_PATH=/secure/deployer.json \
 NAMESPACE_AUTHORITY_KEY_PATH=/secure/namespace-authority.json \
-./scripts/deploy-testnet.sh --dry-run
+cargo run --locked --manifest-path tools/ans-deploy/Cargo.toml -- preflight --dry-run
 ```
 
 The workflow accepts `operation=upgrade` for audit visibility and artifact
-naming. An upgrade uses the same program and deployer keypairs; it is otherwise
-the same guarded deployment path.
+naming; it invokes the guarded deploy action with the persistent program and
+deployer keys.
