@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: "Inspect, fund payer accounts, deploy/upgrade, or initialize the registry"
+        description: "Inspect, fund payer accounts, deploy/upgrade, initialize, or smoke-test the registry"
         type: choice
         required: true
         default: preflight
-        options: [preflight, fund, deploy, upgrade, initialize]
+        options: [preflight, fund, deploy, upgrade, initialize, smoke]
       dry_run:
         description: "Print the deployment manifest without sending transactions"
         type: boolean
@@ -89,7 +89,7 @@ jobs:
           set -euo pipefail
           mkdir -p deployments
           case "${{ inputs.operation }}" in
-            preflight|fund|initialize)
+            preflight|fund|initialize|smoke)
               ACTION="${{ inputs.operation }}"
               ;;
             deploy|upgrade)
