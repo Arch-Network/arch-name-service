@@ -1,20 +1,22 @@
+mod smoke;
+mod tx;
+
 use std::{env, fs, path::Path};
 
 use ans_protocol::{
-    derive::derive_config_address, state::REGISTRY_CONFIG_DISCRIMINATOR, BitcoinNetwork,
-    NameInstruction, RegistryConfig,
+    derive::derive_config_address,
+    state::{decode_state, REGISTRY_CONFIG_DISCRIMINATOR},
+    BitcoinNetwork, NameInstruction, RegistryConfig,
 };
 use anyhow::{bail, Context, Result};
 use arch_program::bitcoin::Network;
-use arch_program::{
-    account::AccountMeta, instruction::Instruction, pubkey::Pubkey, sanitized::ArchMessage,
-};
-use arch_sdk::{
-    build_and_sign_transaction, with_secret_key_file, ArchRpcClient, Config, ProgramDeployer,
-    Status,
-};
-use borsh::{to_vec, BorshDeserialize};
+use arch_program::{account::AccountMeta, instruction::Instruction, pubkey::Pubkey};
+use arch_sdk::{with_secret_key_file, ArchRpcClient, Config, ProgramDeployer};
+use borsh::to_vec;
 use serde::Serialize;
+
+use smoke::{run_smoke, SmokeReport};
+use tx::send_and_confirm;
 
 #[derive(Serialize)]
 struct Deployment {
@@ -29,6 +31,8 @@ struct Deployment {
     program_deployed: bool,
     registry_config: String,
     registry_initialized: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    smoke: Option<SmokeReport>,
     transactions: Vec<TransactionRecord>,
 }
 
@@ -42,13 +46,13 @@ struct PayerStatus {
 }
 
 #[derive(Serialize)]
-struct TransactionRecord {
-    operation: String,
-    txid: String,
+pub(crate) struct TransactionRecord {
+    pub operation: String,
+    pub txid: String,
 }
 
 const TESTNET_NETWORK_ID: u32 = 2;
-const TESTNET_NAMESPACE: &str = ".arch";
+pub(crate) const TESTNET_NAMESPACE: &str = ".arch";
 const FAUCET_AIRDROP_LAMPORTS: u64 = 1_000_000;
 const MIN_DEPLOYER_LAMPORTS: u64 = 5 * FAUCET_AIRDROP_LAMPORTS;
 const MIN_NAMESPACE_AUTHORITY_LAMPORTS: u64 = FAUCET_AIRDROP_LAMPORTS;
@@ -103,6 +107,7 @@ fn main() -> Result<()> {
         program_deployed,
         registry_config: registry_config.to_string(),
         registry_initialized,
+        smoke: None,
         transactions: Vec::new(),
     };
     println!("{}", serde_json::to_string_pretty(&deployment)?);
@@ -212,6 +217,35 @@ fn main() -> Result<()> {
                 println!("Registry initialized and verified.");
             }
         }
+        "smoke" => {
+            if dry_run {
+                println!("DRY RUN: smoke lifecycle transactions not sent.");
+            } else {
+                require_namespace_authority_payer(&deployment.namespace_authority_payer)?;
+                if !program_deployed {
+                    bail!("ANS registry program is not executable; deploy it before smoke");
+                }
+                if !registry_initialized {
+                    bail!("registry is not initialized; run initialize before smoke");
+                }
+                let registry = load_registry_config(&client, registry_config, program_id)?;
+                let (report, txs) = run_smoke(
+                    &client,
+                    &config,
+                    program_id,
+                    registry_config,
+                    &authority_path,
+                    namespace_authority,
+                    deployer,
+                    &registry,
+                )?;
+                deployment.transactions.extend(txs);
+                deployment.smoke = Some(report);
+                fs::write(&output_path, serde_json::to_vec_pretty(&deployment)?)?;
+                println!("{}", serde_json::to_string_pretty(&deployment)?);
+                println!("Smoke lifecycle passed (register → record → primary → transfer).");
+            }
+        }
         _ => unreachable!("parse_args validates action"),
     }
     Ok(())
@@ -223,8 +257,10 @@ fn parse_args() -> Result<(String, bool)> {
     for arg in env::args().skip(1) {
         match arg.as_str() {
             "--dry-run" => dry_run = true,
-            "preflight" | "fund" | "deploy" | "initialize" => action = arg,
-            _ => bail!("usage: ans-deploy [preflight|fund|deploy|initialize] [--dry-run]"),
+            "preflight" | "fund" | "deploy" | "initialize" | "smoke" => action = arg,
+            _ => bail!(
+                "usage: ans-deploy [preflight|fund|deploy|initialize|smoke] [--dry-run]"
+            ),
         }
     }
     Ok((action, dry_run))
@@ -303,8 +339,8 @@ fn verify_registry_config(
     if account.owner != program_id {
         bail!("registry config {address} exists but is not owned by ANS program {program_id}");
     }
-    let config = RegistryConfig::try_from_slice(&account.data)
-        .context("decode existing ANS registry config")?;
+    let config =
+        decode_state::<RegistryConfig>(&account.data).context("decode existing ANS registry config")?;
     Ok(config.header.discriminator == REGISTRY_CONFIG_DISCRIMINATOR
         && config.header.initialized
         && config.header.state_version == 1
@@ -319,6 +355,20 @@ fn verify_registry_config(
         && config.token_programs.is_empty()
         && !config.paused
         && !config.mainnet_enabled)
+}
+
+fn load_registry_config(
+    client: &ArchRpcClient,
+    address: Pubkey,
+    program_id: Pubkey,
+) -> Result<RegistryConfig> {
+    let account = client
+        .read_account_info(address)
+        .with_context(|| format!("read registry config {address}"))?;
+    if account.owner != program_id {
+        bail!("registry config {address} is not owned by program {program_id}");
+    }
+    decode_state(&account.data).context("decode registry config for smoke")
 }
 
 fn initialize_registry(
@@ -343,28 +393,14 @@ fn initialize_registry(
             namespace_authority: namespace_authority.serialize(),
         })?,
     };
-    let blockhash = client
-        .get_best_finalized_block_hash()
-        .context("fetch blockhash for registry initialization")?;
-    let transaction = build_and_sign_transaction(
-        ArchMessage::new(&[instruction], Some(namespace_authority), blockhash),
+    send_and_confirm(
+        client,
+        config,
+        instruction,
+        namespace_authority,
         vec![authority_keypair],
-        config.network,
+        "initialize_registry",
     )
-    .context("build registry initialization transaction")?;
-    let txid = client
-        .send_transaction(transaction)
-        .context("send registry initialization transaction")?;
-    let processed = client
-        .wait_for_processed_transaction(&txid)
-        .context("confirm registry initialization transaction")?;
-    if let Status::Failed(error) = processed.status {
-        bail!("registry initialization transaction {txid} failed: {error}");
-    }
-    if !matches!(processed.status, Status::Processed) {
-        bail!("registry initialization transaction {txid} did not finish processing");
-    }
-    Ok(txid.to_string())
 }
 
 fn required(name: &str) -> Result<String> {

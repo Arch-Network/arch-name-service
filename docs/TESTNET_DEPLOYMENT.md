@@ -94,9 +94,12 @@ and program keys for upgrades. Anyone with a copied key can act as that role.
    configured authority after a successful transaction. The artifact records
    the config address, initialization state, payer evidence, and initialization
    transaction id.
-7. Exercise the instruction tests against testnet before announcing the
-   namespace: register a name, write an `ARCH_OWNER` record, set primary,
-   transfer, and confirm the old record and reverse binding no longer resolve.
+7. Run `operation=smoke` with `dry_run=false`. This registers a unique
+   `smoke{unix}.arch` name (override with `SMOKE_LABEL`), writes an
+   `ARCH_OWNER` record, sets primary, transfers ownership to the deployer
+   pubkey, and asserts resolution: owner updates, the prior record is stale,
+   and the prior reverse binding is invalid. The artifact records label,
+   PDA addresses, four transaction ids, and `smoke.passed=true`.
 
 For a local preflight, supply filesystem paths rather than secrets:
 
@@ -107,6 +110,19 @@ NAMESPACE_AUTHORITY_KEY_PATH=/secure/namespace-authority.json \
 cargo run --locked --manifest-path tools/ans-deploy/Cargo.toml -- preflight --dry-run
 ```
 
-The workflow accepts `operation=upgrade` for audit visibility and artifact
-naming; it invokes the guarded deploy action with the persistent program and
-deployer keys.
+## Upgrades
+
+Every production-facing testnet upgrade must follow this checklist. Keep each
+step as a separate `workflow_dispatch` run so artifacts stay auditable:
+
+1. `operation=preflight` — confirm both payers are `suitable` and the program
+   id / config address still match the custody manifest.
+2. `operation=fund` with `dry_run=false` if either payer is below the minimum.
+3. `operation=upgrade` with `dry_run=false` — rebuilds the SBF ELF and uploads
+   it with the persistent program and deployer keys (`upgrade` is an alias of
+   the guarded deploy action for audit visibility and artifact naming).
+4. `operation=smoke` with `dry_run=false` — must pass before treating the
+   upgrade as ready for client use.
+
+Mainnet is a separate gated deployment and configuration approval. Testnet
+keys and workflows must not automatically control mainnet.
