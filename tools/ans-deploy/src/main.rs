@@ -329,11 +329,14 @@ fn initialize_registry(
     namespace_authority: Pubkey,
     authority_keypair: arch_program::bitcoin::key::Keypair,
 ) -> Result<String> {
+    // System program must be present for the on-chain create_account CPI.
+    // Autara's create_global_config instruction uses the same account shape.
     let instruction = Instruction {
         program_id,
         accounts: vec![
             AccountMeta::new(namespace_authority, true),
             AccountMeta::new(registry_config, false),
+            AccountMeta::new_readonly(Pubkey::system_program(), false),
         ],
         data: to_vec(&NameInstruction::InitializeRegistry {
             network_id: TESTNET_NETWORK_ID,
