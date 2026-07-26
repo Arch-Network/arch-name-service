@@ -321,10 +321,19 @@ fn create_pda(
     accounts: &[AccountInfo],
     seeds: &[&[u8]],
 ) -> Result<(), ProgramError> {
+    // Arch create_account CPIs require the PDA bump in the signer seeds,
+    // matching Autara's global-config / market creation path.
+    let (expected, bump) = Pubkey::find_program_address(seeds, program_id);
+    if account.key != &expected {
+        return Err(ProgramError::InvalidSeeds);
+    }
+    let bump = [bump];
+    let mut signer_seeds = seeds.to_vec();
+    signer_seeds.push(&bump);
     invoke_signed_unchecked(
         &system_instruction::create_account(payer.key, account.key, minimum_rent(0), 0, program_id),
         accounts,
-        &[seeds],
+        &[&signer_seeds],
     )
 }
 
