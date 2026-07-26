@@ -84,9 +84,6 @@ fn initialize_registry(
     require_signer(authority)?;
     let expected = derive_config_address(program_id.serialize(), network_id, TESTNET_NAMESPACE);
     require_address(config, expected)?;
-    if !config.data_is_empty() {
-        return Err(ProgramError::AccountAlreadyInitialized);
-    }
     let state = RegistryConfig {
         header: AccountHeader::initialized(REGISTRY_CONFIG_DISCRIMINATOR),
         program_version: 1,
@@ -104,6 +101,7 @@ fn initialize_registry(
     if authority.key.serialize() != state.namespace_authority {
         return Err(ProgramError::MissingRequiredSignature);
     }
+    let bytes = encode_state(&state);
     let network = network_id.to_le_bytes();
     let namespace = namespace_hash(TESTNET_NAMESPACE);
     let seeds = [
@@ -111,8 +109,18 @@ fn initialize_registry(
         network.as_slice(),
         namespace.as_slice(),
     ];
-    create_pda(program_id, authority, config, accounts, &seeds)?;
-    store(config, &state)
+    // Fresh account: create at full encoded size with rent. Program-owned but
+    // incomplete (e.g. prior zero-size create / rent failure): top up and write.
+    if config.owner == program_id {
+        if config_is_initialized(config) {
+            return Err(ProgramError::AccountAlreadyInitialized);
+        }
+    } else if config.data_is_empty() {
+        create_pda(program_id, authority, config, accounts, &seeds, bytes.len())?;
+    } else {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    store(authority, config, &state)
 }
 
 fn register(
@@ -134,8 +142,20 @@ fn register(
         name_account,
         derive_name_address(program_id.serialize(), &config.namespace, name.name_hash),
     )?;
-    if !name_account.data_is_empty() {
-        return Err(ProgramError::AccountAlreadyInitialized);
+    if name_account.owner == program_id && !name_account.data_is_empty() {
+        if load::<ans_protocol::NameAccount>(name_account)
+            .ok()
+            .and_then(|existing| {
+                existing
+                    .header
+                    .validate(NAME_ACCOUNT_DISCRIMINATOR)
+                    .ok()
+                    .map(|_| true)
+            })
+            .unwrap_or(false)
+        {
+            return Err(ProgramError::AccountAlreadyInitialized);
+        }
     }
     let namespace = namespace_hash(TESTNET_NAMESPACE);
     let seeds = [
@@ -143,8 +163,15 @@ fn register(
         namespace.as_slice(),
         name.name_hash.as_slice(),
     ];
-    create_pda(program_id, owner, name_account, accounts, &seeds)?;
-    store(name_account, &name)
+    let bytes = encode_state(&name);
+    if name_account.owner == program_id {
+        // Resume a prior underfunded create.
+    } else if name_account.data_is_empty() {
+        create_pda(program_id, owner, name_account, accounts, &seeds, bytes.len())?;
+    } else {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    store(owner, name_account, &name)
 }
 
 fn transfer(
@@ -165,7 +192,7 @@ fn transfer(
     let mut name = load_name(program_id, name_account, &config, name_hash)?;
     require_owner(owner, &name.owner)?;
     transition::transfer(&mut name, new_owner);
-    store(name_account, &name)
+    store(owner, name_account, &name)
 }
 
 fn set_record(
@@ -220,9 +247,23 @@ fn set_record(
             name_hash.as_slice(),
             record_kind.as_slice(),
         ];
-        create_pda(program_id, owner, record_account, accounts, &seeds)?;
+        let bytes = encode_state(&record);
+        if record_account.owner == program_id {
+            // Resume a prior underfunded create.
+        } else if record_account.data_is_empty() {
+            create_pda(
+                program_id,
+                owner,
+                record_account,
+                accounts,
+                &seeds,
+                bytes.len(),
+            )?;
+        } else {
+            return Err(ProgramError::IncorrectProgramId);
+        }
     }
-    store(record_account, &record)
+    store(owner, record_account, &record)
 }
 
 fn set_primary(
@@ -244,19 +285,29 @@ fn set_primary(
         derive_reverse_address(program_id.serialize(), &config.namespace, name.owner),
     )?;
     let reverse = transition::set_primary(&mut name);
-    if reverse_account.data_is_empty() {
+    if reverse_account.owner == program_id {
+        // Existing reverse PDA (or prior underfunded create).
+    } else if reverse_account.data_is_empty() {
         let namespace = namespace_hash(TESTNET_NAMESPACE);
         let seeds = [
             b"ans:reverse:v1".as_slice(),
             namespace.as_slice(),
             name.owner.as_slice(),
         ];
-        create_pda(program_id, owner, reverse_account, accounts, &seeds)?;
-    } else if reverse_account.owner != program_id {
+        let bytes = encode_state(&reverse);
+        create_pda(
+            program_id,
+            owner,
+            reverse_account,
+            accounts,
+            &seeds,
+            bytes.len(),
+        )?;
+    } else {
         return Err(ProgramError::IncorrectProgramId);
     }
-    store(name_account, &name)?;
-    store(reverse_account, &reverse)
+    store(owner, name_account, &name)?;
+    store(owner, reverse_account, &reverse)
 }
 
 fn clear_primary(program_id: &Pubkey, accounts: &[AccountInfo]) -> Result<(), ProgramError> {
@@ -320,9 +371,12 @@ fn create_pda(
     account: &AccountInfo,
     accounts: &[AccountInfo],
     seeds: &[&[u8]],
+    space: usize,
 ) -> Result<(), ProgramError> {
     // Arch create_account CPIs require the PDA bump in the signer seeds,
-    // matching Autara's global-config / market creation path.
+    // matching Autara's global-config / market creation path. Allocate the
+    // full encoded size up front so the account is rent-exempt without a
+    // later underfunded realloc.
     let (expected, bump) = Pubkey::find_program_address(seeds, program_id);
     if account.key != &expected {
         return Err(ProgramError::InvalidSeeds);
@@ -331,10 +385,46 @@ fn create_pda(
     let mut signer_seeds = seeds.to_vec();
     signer_seeds.push(&bump);
     invoke_signed_unchecked(
-        &system_instruction::create_account(payer.key, account.key, minimum_rent(0), 0, program_id),
+        &system_instruction::create_account(
+            payer.key,
+            account.key,
+            minimum_rent(space),
+            space as u64,
+            program_id,
+        ),
         accounts,
         &[&signer_seeds],
     )
+}
+
+fn fund_rent_exempt(payer: &AccountInfo, account: &AccountInfo, space: usize) -> Result<(), ProgramError> {
+    let required = minimum_rent(space);
+    let current = account.lamports();
+    if current >= required {
+        return Ok(());
+    }
+    let needed = required.saturating_sub(current);
+    let mut payer_lamports = payer.try_borrow_mut_lamports()?;
+    let mut account_lamports = account.try_borrow_mut_lamports()?;
+    if **payer_lamports < needed {
+        return Err(ProgramError::InsufficientFunds);
+    }
+    **payer_lamports -= needed;
+    **account_lamports += needed;
+    Ok(())
+}
+
+fn config_is_initialized(account: &AccountInfo) -> bool {
+    load::<RegistryConfig>(account)
+        .ok()
+        .and_then(|config| {
+            config
+                .header
+                .validate(REGISTRY_CONFIG_DISCRIMINATOR)
+                .ok()
+                .map(|_| true)
+        })
+        .unwrap_or(false)
 }
 
 fn load<T: BorshDeserialize>(account: &AccountInfo) -> Result<T, ProgramError> {
@@ -344,9 +434,16 @@ fn load<T: BorshDeserialize>(account: &AccountInfo) -> Result<T, ProgramError> {
     decode_state(&account.data.borrow()).map_err(|_| ProgramError::InvalidAccountData)
 }
 
-fn store<T: borsh::BorshSerialize>(account: &AccountInfo, state: &T) -> Result<(), ProgramError> {
+fn store<T: borsh::BorshSerialize>(
+    payer: &AccountInfo,
+    account: &AccountInfo,
+    state: &T,
+) -> Result<(), ProgramError> {
     let bytes = encode_state(state);
-    account.realloc(bytes.len(), false)?;
+    fund_rent_exempt(payer, account, bytes.len())?;
+    if account.data_len() != bytes.len() {
+        account.realloc(bytes.len(), false)?;
+    }
     account.data.borrow_mut().copy_from_slice(&bytes);
     Ok(())
 }
