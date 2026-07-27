@@ -10,7 +10,7 @@ Captured: 2026-07-26
 | TypeScript SDK | `packages/ans-sdk` | **Published** `@arch-network/ans-sdk@0.1.0-testnet.0` (`testnet` + `latest` tags) |
 | SDK tarball | `deployments/arch-network-ans-sdk-0.1.0-testnet.0.tgz` | npm shasum `94987b755a045b297cb95e8d1a61f228eacabe83` |
 | Manager SPA | `apps/ans-manager` | Build + unit tests green; pinned to `0.1.0-testnet.0` |
-| AWS hosting | `infra/cdk`, `.github/workflows/deploy-ans-manager.yml` | Infra ready; **live deploy gated** |
+| AWS hosting | `infra/cdk`, `.github/workflows/deploy-ans-manager.yml` | **Live** at https://id.arch.network (account `920373001452`) |
 | Chrome wallet | `arch-wallet-hub` apps/chrome-wallet | Resolve + Send freeze + Receive/Header + Approve verified name |
 
 ## Frozen testnet manifest
@@ -55,14 +55,20 @@ registry: https://www.npmjs.com/package/@arch-network/ans-sdk
 
 Manager and Chrome wallet pin exact `0.1.0-testnet.0`.
 
-## AWS deploy gate
+## AWS deploy
 
-Do not deploy `id.arch.network` until:
+Deployed 2026-07-27 to account `920373001452` / `us-east-1`:
 
-1. Target AWS account / `arch.network` hosted zone ID confirmed
-2. Cost estimate accepted (~$1–5/month low traffic)
-3. `cdk deploy` outputs bucket + distribution + OIDC role ARNs stored as GitHub Environment secrets
-4. Manual workflow `deploy-ans-manager` run with `confirm_domain=id.arch.network`
+| Item | Value |
+|------|-------|
+| Site | https://id.arch.network |
+| Hosted zone | `Z1010690127K5I1CNQ3QF` (`arch.network`) |
+| Bucket | `ansmanagerstack-sitebucket397a1860-rsfm1tvvqd92` |
+| Distribution | `E22LDGO96BLE0F` |
+| Deploy role | `arn:aws:iam::920373001452:role/AnsManagerStack-GitHubDeployRoleED73FD64-UHSNglsHFV9X` |
+| Evidence | `deployments/ans-manager-deploy.json` |
+
+GitHub Environment `ans-manager` secrets are set for CI deploys.
 
 ## Mainnet
 
