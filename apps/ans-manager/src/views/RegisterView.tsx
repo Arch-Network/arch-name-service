@@ -46,8 +46,10 @@ export function RegisterView() {
     <section>
       <h1 className="page-title">Register</h1>
       <p className="page-subtitle">
-        Free permanent `.arch` names on testnet. Mutations require a Turnkey-backed Arch Wallet
-        account (linked external wallets cannot sign ANS message hashes yet).
+        Free permanent `.arch` names on testnet. If your Arch account is new, the
+        first mutation will create it via the testnet faucet (one wallet approval),
+        then register the name. Linked external wallets cannot sign ANS message
+        hashes yet — use a Turnkey-backed Arch Wallet account.
       </p>
       <form className="card stack" onSubmit={(e) => void onRegister(e)}>
         <div>

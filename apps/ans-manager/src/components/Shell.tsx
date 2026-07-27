@@ -21,49 +21,54 @@ export function Shell() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand">
-          <img className="brand-swap-light" src="/brand/arch-logo-orange.svg" alt="Arch" />
-          <img className="brand-swap-dark" src="/brand/arch-logo-cream.svg" alt="Arch" />
-          <span className="badge">Testnet</span>
+        <div className="topbar-main">
+          <div className="brand">
+            <img className="brand-swap-light" src="/brand/arch-logo-orange.svg" alt="Arch" />
+            <img className="brand-swap-dark" src="/brand/arch-logo-cream.svg" alt="Arch" />
+            <span className="network-pill">
+              <span className="network-dot" aria-hidden />
+              Testnet
+            </span>
+          </div>
+          <div className="header-actions">
+            <select
+              className="theme-select"
+              aria-label="Theme"
+              value={theme}
+              onChange={(e) => setTheme(e.target.value as typeof theme)}
+            >
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+            {account ? (
+              <span className="address-chip mono" title={account.archAddress}>
+                {account.archAddress.slice(0, 6)}…{account.archAddress.slice(-4)}
+              </span>
+            ) : (
+              <button className="btn btn-primary connect-btn" disabled={!available || connecting} onClick={() => void connect()}>
+                {connecting ? "Connecting…" : available ? "Connect wallet" : "Detecting wallet…"}
+              </button>
+            )}
+          </div>
         </div>
-        <nav className="nav">
-          <NavLink to="/" end>
-            Search
-          </NavLink>
+        <nav className="nav" aria-label="ANS navigation">
+          <NavLink to="/" end>Search</NavLink>
           <NavLink to="/register">Register</NavLink>
           <NavLink to="/manage">Manage</NavLink>
           <NavLink to="/names">My names</NavLink>
         </nav>
-        <div className="row">
-          <select
-            className="input"
-            style={{ width: "auto" }}
-            value={theme}
-            onChange={(e) => setTheme(e.target.value as typeof theme)}
-          >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-          {account ? (
-            <span className="mono" title={account.archAddress}>
-              {account.archAddress.slice(0, 6)}…{account.archAddress.slice(-4)}
-            </span>
-          ) : (
-            <button className="btn btn-primary" disabled={!available || connecting} onClick={() => void connect()}>
-              {connecting ? "Connecting…" : available ? "Connect wallet" : "Waiting for wallet…"}
-            </button>
-          )}
-        </div>
       </header>
-      {error ? <p className="status-err" style={{ marginBottom: 16 }}>{error}</p> : null}
-      {!available ? (
-        <p className="status-warn" style={{ marginBottom: 16 }}>
-          Looking for Arch Wallet… If this persists, unlock the extension, confirm it is enabled for
-          this site, then refresh. Search still works without connecting.
-        </p>
-      ) : null}
-      <Outlet />
+      <main className="page-content">
+        {error ? <p className="status-banner status-err">{error}</p> : null}
+        {!available ? (
+          <p className="status-banner status-warn">
+            Looking for Arch Wallet. Unlock the extension, allow it on this site, then refresh.
+            Search remains available without connecting.
+          </p>
+        ) : null}
+        <Outlet />
+      </main>
     </div>
   );
 }

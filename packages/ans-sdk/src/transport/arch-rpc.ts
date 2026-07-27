@@ -11,6 +11,10 @@ type JsonRpcResponse<T> = {
   error?: { message?: string };
 };
 
+function isAccountMissingError(message: string | undefined): boolean {
+  return (message ?? "").toLowerCase().includes("account is not in database");
+}
+
 async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T> {
   const response = await fetch(url, {
     method: "POST",
@@ -63,19 +67,27 @@ function pubkeyParams(pubkey: Uint8Array | string): number[] {
 export function createArchRpcTransport(rpcUrl: string): AnsTransport {
   return {
     async readAccountInfo(pubkey) {
-      const result = await rpc<{
-        data?: unknown;
-        owner?: unknown;
-        lamports?: number;
-        is_executable?: boolean;
-      } | null>(rpcUrl, "read_account_info", pubkeyParams(pubkey));
-      if (!result) return null;
-      return {
-        data: toBytes(result.data),
-        owner: toBytes(result.owner),
-        lamports: result.lamports ?? 0,
-        isExecutable: Boolean(result.is_executable),
-      } satisfies AccountInfo;
+      try {
+        const result = await rpc<{
+          data?: unknown;
+          owner?: unknown;
+          lamports?: number;
+          is_executable?: boolean;
+        } | null>(rpcUrl, "read_account_info", pubkeyParams(pubkey));
+        if (!result) return null;
+        return {
+          data: toBytes(result.data),
+          owner: toBytes(result.owner),
+          lamports: result.lamports ?? 0,
+          isExecutable: Boolean(result.is_executable),
+        } satisfies AccountInfo;
+      } catch (error) {
+        // Arch RPC returns a JSON-RPC error for missing accounts instead of null.
+        if (error instanceof Error && isAccountMissingError(error.message)) {
+          return null;
+        }
+        throw error;
+      }
     },
 
     async getProgramAccounts(programId, filters = []) {
