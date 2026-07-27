@@ -7,9 +7,9 @@ Captured: 2026-07-26
 | Component | Location | Version / status |
 |-----------|----------|------------------|
 | Protocol fixtures | `tools/ans-fixtures`, `packages/ans-sdk/fixtures` | Generated + CI drift check |
-| TypeScript SDK | `packages/ans-sdk` | `@arch-network/ans-sdk@0.1.0-testnet.0` |
-| SDK tarball | `deployments/arch-network-ans-sdk-0.1.0-testnet.0.tgz` | sha256 `7d4bdad3a0b5eab1ff45c853cde54d16bb56f47e900c34ee9f7ca64aee497f2f` |
-| Manager SPA | `apps/ans-manager` | Build + unit tests green; pins SDK via `file:` until npm publish |
+| TypeScript SDK | `packages/ans-sdk` | **Published** `@arch-network/ans-sdk@0.1.0-testnet.0` (`testnet` + `latest` tags) |
+| SDK tarball | `deployments/arch-network-ans-sdk-0.1.0-testnet.0.tgz` | npm shasum `94987b755a045b297cb95e8d1a61f228eacabe83` |
+| Manager SPA | `apps/ans-manager` | Build + unit tests green; pinned to `0.1.0-testnet.0` |
 | AWS hosting | `infra/cdk`, `.github/workflows/deploy-ans-manager.yml` | Infra ready; **live deploy gated** |
 | Chrome wallet | `arch-wallet-hub` apps/chrome-wallet | Resolve + Send freeze + Receive/Header + Approve verified name |
 
@@ -43,20 +43,17 @@ cd apps/ans-manager && npm run smoke:read
 chrome-wallet: npm test -- --run src/utils/__tests__/name-service.test.ts  # 5/5
 ```
 
-## npm publish gate
+## npm publish
 
-`npm whoami` currently returns `401 Unauthorized` for this environment.
-Prerelease artifact is packed locally:
+Published 2026-07-27:
 
-```bash
-cd packages/ans-sdk
-npm run build
-npm pack --pack-destination ../../deployments
-# Then, with org credentials:
-npm publish ../../deployments/arch-network-ans-sdk-0.1.0-testnet.0.tgz --tag testnet
+```text
+@arch-network/ans-sdk@0.1.0-testnet.0
+dist-tags: testnet=0.1.0-testnet.0, latest=0.1.0-testnet.0
+registry: https://www.npmjs.com/package/@arch-network/ans-sdk
 ```
 
-Until publish succeeds, manager and Chrome wallet continue to use the monorepo `file:` dependency pointing at `packages/ans-sdk@0.1.0-testnet.0`.
+Manager and Chrome wallet pin exact `0.1.0-testnet.0`.
 
 ## AWS deploy gate
 
