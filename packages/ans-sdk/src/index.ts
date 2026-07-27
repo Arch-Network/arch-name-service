@@ -50,7 +50,7 @@ export {
   resolvePrimary,
   resolveRecord,
 } from "./resolve.js";
-export { createArchRpcTransport } from "./transport/arch-rpc.js";
+export { createArchRpcTransport, normalizeRuntimeTransaction } from "./transport/arch-rpc.js";
 export type {
   AccountInfo,
   AnsTransport,

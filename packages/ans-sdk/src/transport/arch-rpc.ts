@@ -15,7 +15,7 @@ function isAccountMissingError(message: string | undefined): boolean {
   return (message ?? "").toLowerCase().includes("account is not in database");
 }
 
-async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T> {
+async function rpc<T>(url: string, method: string, params: unknown): Promise<T> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -34,6 +34,91 @@ async function rpc<T>(url: string, method: string, params: unknown[]): Promise<T
     throw new Error(body.error.message ?? `Arch RPC error for ${method}`);
   }
   return body.result as T;
+}
+
+function toNumberArray(value: unknown): number[] {
+  if (value instanceof Uint8Array) return Array.from(value);
+  if (Array.isArray(value)) return value.map((item) => Number(item) || 0);
+  if (value && typeof value === "object") {
+    // JSON.stringify(Uint8Array) yields {"0":n,"1":n,...}; undo that.
+    const entries = Object.keys(value)
+      .filter((key) => /^\d+$/.test(key))
+      .sort((a, b) => Number(a) - Number(b))
+      .map((key) => Number((value as Record<string, unknown>)[key]) || 0);
+    if (entries.length > 0) return entries;
+  }
+  return [];
+}
+
+/**
+ * Arch JSON-RPC rejects Uint8Array fields (they serialize as maps). Convert
+ * every byte buffer to a plain number[] before submission.
+ */
+export function normalizeRuntimeTransaction(value: unknown): {
+  version: number;
+  signatures: number[][];
+  message: {
+    header: {
+      num_required_signatures: number;
+      num_readonly_signed_accounts: number;
+      num_readonly_unsigned_accounts: number;
+    };
+    account_keys: number[][];
+    recent_blockhash: number[];
+    instructions: Array<{
+      program_id_index: number;
+      accounts: number[];
+      data: number[];
+    }>;
+  };
+} {
+  const tx = (value ?? {}) as {
+    version?: unknown;
+    signatures?: unknown;
+    message?: {
+      header?: {
+        num_required_signatures?: unknown;
+        num_readonly_signed_accounts?: unknown;
+        num_readonly_unsigned_accounts?: unknown;
+      };
+      account_keys?: unknown;
+      recent_blockhash?: unknown;
+      instructions?: Array<{
+        program_id_index?: unknown;
+        accounts?: unknown;
+        data?: unknown;
+      }>;
+    };
+  };
+
+  return {
+    version: typeof tx.version === "number" ? tx.version : 0,
+    signatures: Array.isArray(tx.signatures)
+      ? tx.signatures.map((sig) => toNumberArray(sig))
+      : [],
+    message: {
+      header: {
+        num_required_signatures: Number(tx.message?.header?.num_required_signatures) || 0,
+        num_readonly_signed_accounts:
+          Number(tx.message?.header?.num_readonly_signed_accounts) || 0,
+        num_readonly_unsigned_accounts:
+          Number(tx.message?.header?.num_readonly_unsigned_accounts) || 0,
+      },
+      account_keys: Array.isArray(tx.message?.account_keys)
+        ? tx.message.account_keys.map((key) => toNumberArray(key))
+        : [],
+      recent_blockhash: toNumberArray(tx.message?.recent_blockhash),
+      instructions: Array.isArray(tx.message?.instructions)
+        ? tx.message.instructions.map((ix) => ({
+            program_id_index: Number(ix.program_id_index) || 0,
+            accounts: Array.isArray(ix.accounts)
+              ? ix.accounts.map((account) => Number(account) || 0)
+              : [],
+            data: toNumberArray(ix.data),
+          }))
+        : [],
+    },
+  };
 }
 
 function toBytes(value: unknown): Uint8Array {
@@ -124,14 +209,16 @@ export function createArchRpcTransport(rpcUrl: string): AnsTransport {
     },
 
     async sendTransaction(transaction) {
-      return rpc<string>(rpcUrl, "send_transaction", [transaction]);
+      // Direct Arch RPC expects the runtime tx as the bare `params` object
+      // (not `[tx]`). Uint8Array fields must be plain number arrays.
+      return rpc<string>(rpcUrl, "send_transaction", normalizeRuntimeTransaction(transaction));
     },
 
     async getProcessedTransaction(txid) {
       const result = await rpc<{ status?: unknown; error?: string } | null>(
         rpcUrl,
         "get_processed_transaction",
-        [txid],
+        { tx_id: txid },
       );
       if (!result) return null;
       if (typeof result.status === "string") {

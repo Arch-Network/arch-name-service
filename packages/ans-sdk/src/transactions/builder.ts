@@ -1,5 +1,6 @@
 import { SanitizedMessageUtil } from "@saturnbtcio/arch-sdk";
 
+import { normalizeRuntimeTransaction } from "../transport/arch-rpc.js";
 import type { AnsTransport } from "../transport/types.js";
 import type { ArchAddress, BuiltInstruction } from "../types.js";
 
@@ -36,10 +37,10 @@ export async function buildTransaction(
 
   const hashBytes = SanitizedMessageUtil.hash(messageResult);
   const messageHashHex = new TextDecoder().decode(hashBytes);
-  const transaction: RuntimeTransaction = {
+  const transaction: RuntimeTransaction = normalizeRuntimeTransaction({
     version: 0,
     signatures: [],
     message: messageResult,
-  };
+  });
   return { transaction, messageHashHex };
 }
