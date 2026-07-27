@@ -3,6 +3,8 @@
  * makeSwapSigner, without a hard dependency on that package.
  */
 
+import { SignatureUtil } from "@saturnbtcio/arch-sdk";
+
 export interface AnsWalletSigner {
   signArchMessageHash(opts: {
     messageHashHex: string;
@@ -20,9 +22,18 @@ function hexToBytes(hex: string): Uint8Array {
   return out;
 }
 
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /**
- * Returns a compact BIP-322 witness blob (base64) containing the 64-byte
- * Schnorr signature. Callers that need only the raw 64 bytes can decode it.
+ * Bridge a wallet `signArchMessageHash` into the runner callback.
+ *
+ * `challenge` is the lowercase 64-char hex string produced by
+ * `TextDecoder().decode(SanitizedMessageUtil.hash(message))`. The wallet
+ * BIP-322-signs the UTF-8 bytes of that string. Arch requires the
+ * resulting Schnorr signature to be low-S normalized via
+ * `SignatureUtil.adjustSignature` before inclusion in the runtime tx.
  */
 export function makeAnsSigner(walletSigner: AnsWalletSigner): TransactionSigner {
   return async (challenge: string): Promise<string> => {
@@ -35,8 +46,12 @@ export function makeAnsSigner(walletSigner: AnsWalletSigner): TransactionSigner 
         `Wallet returned a ${schnorrSig.length}-byte signature; expected 64 bytes`,
       );
     }
-    // Return raw 64-byte hex for maximum portability. Manager/submit helpers
-    // can wrap into BIP-322 witness if the RPC path requires it.
-    return signature64Hex;
+    const adjusted = SignatureUtil.adjustSignature(schnorrSig);
+    if (adjusted.length !== 64) {
+      throw new Error(
+        `adjustSignature returned ${adjusted.length} bytes; expected 64`,
+      );
+    }
+    return bytesToHex(adjusted);
   };
 }

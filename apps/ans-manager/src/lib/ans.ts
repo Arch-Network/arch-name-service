@@ -88,6 +88,8 @@ async function signMessageHashHex(messageHashHex: string): Promise<string> {
   if (!window.arch?.signArchMessageHash) {
     throw new Error("Arch Wallet is not available. Install/enable the Chrome extension.");
   }
+  // Provider API takes the 32-byte digest and re-hexes it for the wallet.
+  // Challenge from SanitizedMessageUtil.hash is already that lowercase hex.
   const hashBytes = fromHex(messageHashHex);
   if (hashBytes.length !== 32) {
     throw new Error(`Expected 32-byte message hash, got ${hashBytes.length}`);
@@ -106,6 +108,12 @@ async function signMessageHashHex(messageHashHex: string): Promise<string> {
     return toHex(result.signature);
   }
   throw new Error("Wallet returned an unrecognized signature payload");
+}
+
+async function signAndAdjustMessageHashHex(messageHashHex: string): Promise<string> {
+  const { SignatureUtil } = await import("@saturnbtcio/arch-sdk");
+  const raw = await signMessageHashHex(messageHashHex);
+  return toHex(SignatureUtil.adjustSignature(fromHex(raw)));
 }
 
 /**
@@ -163,7 +171,7 @@ export async function ensureArchAccount(archAddress: string): Promise<void> {
     })),
   };
   const messageHashHex = new TextDecoder().decode(SanitizedMessageUtil.hash(sdkMessage as never));
-  const userSigHex = await signMessageHashHex(messageHashHex);
+  const userSigHex = await signAndAdjustMessageHashHex(messageHashHex);
   const signed = {
     ...body.result,
     signatures: [...body.result.signatures, Array.from(fromHex(userSigHex))],
