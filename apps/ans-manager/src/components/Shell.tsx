@@ -51,7 +51,7 @@ export function Shell() {
             </span>
           ) : (
             <button className="btn btn-primary" disabled={!available || connecting} onClick={() => void connect()}>
-              {connecting ? "Connecting…" : available ? "Connect wallet" : "Install Arch Wallet"}
+              {connecting ? "Connecting…" : available ? "Connect wallet" : "Waiting for wallet…"}
             </button>
           )}
         </div>
@@ -59,8 +59,8 @@ export function Shell() {
       {error ? <p className="status-err" style={{ marginBottom: 16 }}>{error}</p> : null}
       {!available ? (
         <p className="status-warn" style={{ marginBottom: 16 }}>
-          Install the Arch Wallet Chrome extension to register or manage names. Search and reverse
-          lookup work without connecting.
+          Looking for Arch Wallet… If this persists, unlock the extension, confirm it is enabled for
+          this site, then refresh. Search still works without connecting.
         </p>
       ) : null}
       <Outlet />
