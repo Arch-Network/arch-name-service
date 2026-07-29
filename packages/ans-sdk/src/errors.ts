@@ -7,6 +7,7 @@ export type AnsErrorCode =
   | "UnsupportedAccountVersion"
   | "InvalidAccountDerivation"
   | "NameMismatch"
+  | "NameTaken"
   | "InactiveName"
   | "StaleRecord"
   | "RecordTypeMismatch"

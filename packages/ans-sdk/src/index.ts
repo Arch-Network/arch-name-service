@@ -1,4 +1,12 @@
-export { AnsClient } from "./client/ans-client.js";
+export {
+  classifyNameAccountData,
+  duplicateRegistrationError,
+  isBlankAccountData,
+  isDuplicateRegistrationErrorMessage,
+  type ClassifiedNameAccount,
+  type NameAvailability,
+} from "./availability.js";
+export { AnsClient, type NameAvailabilityResult } from "./client/ans-client.js";
 export {
   assertManifestConsistency,
   loadTestnetManifest,

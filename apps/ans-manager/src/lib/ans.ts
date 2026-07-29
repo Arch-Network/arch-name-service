@@ -1,6 +1,8 @@
 import {
   AnsClient,
+  AnsError,
   createArchRpcTransport,
+  isDuplicateRegistrationErrorMessage,
   loadTestnetManifest,
   makeAnsSigner,
   signAndSendInstruction,
@@ -31,6 +33,10 @@ export const ansClient = {
     getAnsClient().fetchRegistryConfig(...args),
   fetchNameAccount: (...args: Parameters<AnsClient["fetchNameAccount"]>) =>
     getAnsClient().fetchNameAccount(...args),
+  getNameAvailability: (...args: Parameters<AnsClient["getNameAvailability"]>) =>
+    getAnsClient().getNameAvailability(...args),
+  assertNameAvailable: (...args: Parameters<AnsClient["assertNameAvailable"]>) =>
+    getAnsClient().assertNameAvailable(...args),
   resolveOwner: (...args: Parameters<AnsClient["resolveOwner"]>) =>
     getAnsClient().resolveOwner(...args),
   resolveRecord: (...args: Parameters<AnsClient["resolveRecord"]>) =>
@@ -212,4 +218,25 @@ export async function submitWithWindowArch(
 
 export function explorerTxUrl(txid: string): string {
   return `https://explorer.arch.network/testnet/tx/${txid}`;
+}
+
+export function formatRegistrationError(err: unknown, label?: string): string {
+  const canonical = label
+    ? label.includes(".")
+      ? label
+      : `${label}.arch`
+    : null;
+  if (
+    (err instanceof AnsError && err.code === "NameTaken") ||
+    (err instanceof Error && isDuplicateRegistrationErrorMessage(err.message))
+  ) {
+    return canonical
+      ? `${canonical} is already registered`
+      : err instanceof Error
+        ? err.message
+        : "name is already registered";
+  }
+  if (err instanceof AnsError) return err.message || err.code;
+  if (err instanceof Error) return err.message;
+  return String(err);
 }

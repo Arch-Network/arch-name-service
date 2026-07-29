@@ -1,3 +1,7 @@
+import {
+  duplicateRegistrationError,
+  isDuplicateRegistrationErrorMessage,
+} from "../availability.js";
 import type { AnsTransport } from "../transport/types.js";
 import type { ArchAddress, BuiltInstruction } from "../types.js";
 import type { TransactionSigner } from "../wallet/adapter.js";
@@ -39,7 +43,11 @@ export async function signAndSendInstruction(params: {
       continue;
     }
     if (processed.status === "Failed") {
-      throw new Error(processed.error ?? `transaction ${txid} failed`);
+      const message = processed.error ?? `transaction ${txid} failed`;
+      if (isDuplicateRegistrationErrorMessage(message)) {
+        throw duplicateRegistrationError("name");
+      }
+      throw new Error(message);
     }
     if (processed.status === "Processed" || processed.status.toLowerCase().includes("processed")) {
       return txid;
