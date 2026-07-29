@@ -12,11 +12,22 @@ pub fn send_and_confirm(
     signers: Vec<Keypair>,
     operation: &str,
 ) -> Result<String> {
+    send_and_confirm_many(client, config, vec![instruction], fee_payer, signers, operation)
+}
+
+pub fn send_and_confirm_many(
+    client: &ArchRpcClient,
+    config: &Config,
+    instructions: Vec<Instruction>,
+    fee_payer: Pubkey,
+    signers: Vec<Keypair>,
+    operation: &str,
+) -> Result<String> {
     let blockhash = client
         .get_best_finalized_block_hash()
         .with_context(|| format!("fetch blockhash for {operation}"))?;
     let transaction = build_and_sign_transaction(
-        ArchMessage::new(&[instruction], Some(fee_payer), blockhash),
+        ArchMessage::new(&instructions, Some(fee_payer), blockhash),
         signers,
         config.network,
     )

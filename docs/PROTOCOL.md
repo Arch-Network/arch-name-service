@@ -90,11 +90,14 @@ Expiry comparisons use the Arch canonical block-height or slot clock, chosen onc
 
 ## 5. Typed record validation
 
-Records are enum-tagged, never arbitrary key/value strings. Unknown types are rejected. The first release supports:
+Records are typed for Arch-native destinations and extensible UTF-8 for
+SNS-parity identity/payment/content keys. Unknown `RecordType` discriminants
+are rejected. Supported types:
 
-1. `ARCH_OWNER` — exactly one canonical Arch address. It must equal the current `NameAccount.owner`; publishing an alias is not permitted.
+1. `ARCH_OWNER` — exactly one canonical Arch address. It must equal the current `NameAccount.owner`; publishing an alias is not permitted. This is the default Arch payment destination (like SNS owner when no SOL record is set).
 2. `BITCOIN_TAPROOT` — a canonical Bitcoin SegWit v1, 32-byte witness-program address. Network HRP must match the configured network policy (for example, testnet/signet versus mainnet). Decode and re-encode before storage to eliminate alternate encodings.
-3. `TOKEN_ATA` — `token_id` plus an ATA address. The program verifies the address is the canonical associated-token-account derivation for `(NameAccount.owner, token_id)` under the configured token-program IDs. It rejects an arbitrary token account, a mismatched authority, or an unsupported token program.
+3. `TOKEN_ATA` — `token_id` plus an ATA address. The program verifies the address is the canonical associated-token-account derivation for `(NameAccount.owner, token_id)` under the configured token-program IDs. It rejects an arbitrary token account, a mismatched authority, or an unsupported token program. Gated when `token_programs` is empty.
+4. `TEXT` — UTF-8 `{ key, value }` profile rows (ETH, URL, Discord, IPFS, …). Keys are lowercase `[a-z0-9_-]{1,32}`; values are printable ASCII up to 256 bytes. PDA seeds include a domain-separated key hash so the catalog can grow without new enum variants. Client SDKs apply format checks for known keys (e.g. ETH `0x` + 40 hex); the program enforces key/value shape and size only.
 
 The codec has a maximum value size per type. Each update requires `expected_revision`, preventing a signer from silently overwriting a value after a client observed stale state. Resolution returns the value only when the name is active, account derivations match, `owner_snapshot` and `record_epoch` match the current name, and the record codec version is supported.
 

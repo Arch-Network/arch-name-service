@@ -19,8 +19,8 @@ base64-encoded keypair files:
   the one-time registry initialization instruction and pays that transaction's
   fee. It too must be an on-chain, system-owned, funded account. It has no
   authority over registered names.
-- `ARCH_RPC_URL` — optional testnet RPC override. It defaults to
-  `https://rpc.testnet.arch.network`.
+- `ARCH_RPC_URL` — optional testnet RPC override. It defaults to the
+  authenticated Explorer proxy at `https://id.arch.network/rpc`.
 
 Keep the raw keys out of the repository. The deployer key must remain unchanged
 for in-place upgrades. The program derives addresses from its runtime program

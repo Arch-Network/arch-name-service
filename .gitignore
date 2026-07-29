@@ -5,5 +5,7 @@
 /packages/ans-sdk/dist/
 /apps/ans-manager/node_modules/
 /apps/ans-manager/dist/
+/apps/ans-manager/tsconfig.tsbuildinfo
 /infra/cdk/node_modules/
 /infra/cdk/cdk.out/
+/infra/cdk/dist/
