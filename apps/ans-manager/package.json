@@ -9,17 +9,27 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "smoke:read": "node scripts/smoke-read.mjs"
+    "smoke:read": "node scripts/smoke-read.mjs",
+    "ensure:wallet-kit": "node scripts/ensure-wallet-kit.mjs",
+    "postinstall": "node scripts/ensure-wallet-kit.mjs"
   },
   "dependencies": {
-    "@arch-network/ans-sdk": "0.1.0-testnet.3",
+    "@arch-network/ans-sdk": "file:../../packages/ans-sdk",
+    "@arch-network/wallet-connect-kit": "file:vendor/arch-network-wallet-connect-kit-0.1.0.tgz",
+    "@noble/curves": "^1.9.7",
+    "@noble/hashes": "^1.8.0",
+    "@omnisat/lasereyes": "^0.0.162",
+    "@saturnbtcio/arch-sdk": "^0.0.24",
     "bs58": "^6.0.0",
+    "buffer": "^6.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.0",
-    "@saturnbtcio/arch-sdk": "^0.0.24"
+    "simple-icons": "^16.27.1",
+    "vite-plugin-node-polyfills": "^0.23.0"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.4",

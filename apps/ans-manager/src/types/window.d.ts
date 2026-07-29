@@ -1,11 +1,24 @@
 export {};
 
+type ArchProviderAccount = {
+  address: string;
+  publicKey: string;
+  archAddress: string;
+  /** Optional; newer extensions may report turnkey | external | watch. */
+  kind?: string;
+};
+
 declare global {
+  /** Injected by Vite's `define`; see `buildStamp()` in vite.config.ts. */
+  const __ANS_BUILD__: string;
+
   interface Window {
+    /** The running bundle's build stamp, for support conversations. */
+    __ansBuild?: string;
     arch?: {
-      connect(): Promise<{ address: string; publicKey: string; archAddress: string }>;
+      connect(): Promise<ArchProviderAccount>;
       disconnect?(): Promise<void>;
-      getAccount?(): Promise<{ address: string; publicKey: string; archAddress: string } | null>;
+      getAccount?(): Promise<ArchProviderAccount | null>;
       signArchMessageHash(
         messageHash: Uint8Array,
       ): Promise<

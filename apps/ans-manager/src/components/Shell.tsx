@@ -1,10 +1,20 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useArchWallet } from "../hooks/useArchWallet";
+import { useWalletRecovery } from "../hooks/useWalletRecovery";
+import { shortArchAddress } from "../lib/arch-identity";
+import { walletCtaDisabled, walletStatusCta } from "../lib/wallet-status";
+import { ExplorerLink } from "./ExplorerLink";
 
 export function Shell() {
-  const { available, account, connect, connecting, error } = useArchWallet();
+  const { status, reportedAccount, connecting, error, openWalletPicker } = useArchWallet();
+  const recovery = useWalletRecovery();
   const [theme, setTheme] = useState<"light" | "dark" | "system">("system");
+  const cta = walletStatusCta(status);
+  const busy = connecting || recovery.working !== null;
+  const providerLabel =
+    reportedAccount?.providerLabel ??
+    (reportedAccount?.providerId === "arch-extension" ? "Arch Wallet" : null);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -18,6 +28,19 @@ export function Shell() {
     return () => media.removeEventListener("change", apply);
   }, [theme]);
 
+  const runHeaderCta = () => {
+    if (!cta) return;
+    if (
+      cta.action === "choose_wallet" ||
+      cta.action === "connect" ||
+      cta.action === "install"
+    ) {
+      openWalletPicker();
+      return;
+    }
+    void recovery.run(cta.action);
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -30,6 +53,11 @@ export function Shell() {
               Testnet
             </span>
           </div>
+          <nav className="nav" aria-label="ANS navigation">
+            <NavLink to="/" end>Discover</NavLink>
+            <NavLink to="/manage">Manage</NavLink>
+            <NavLink to="/names">My names</NavLink>
+          </nav>
           <div className="header-actions">
             <select
               className="theme-select"
@@ -41,34 +69,48 @@ export function Shell() {
               <option value="light">Light</option>
               <option value="dark">Dark</option>
             </select>
-            {account ? (
-              <span className="address-chip mono" title={account.archAddress}>
-                {account.archAddress.slice(0, 6)}…{account.archAddress.slice(-4)}
-              </span>
-            ) : (
-              <button className="btn btn-primary connect-btn" disabled={!available || connecting} onClick={() => void connect()}>
-                {connecting ? "Connecting…" : available ? "Connect wallet" : "Detecting wallet…"}
+            {reportedAccount ? (
+              <ExplorerLink
+                kind="account"
+                value={reportedAccount.archAddress}
+                className="address-chip mono"
+              >
+                {providerLabel ? (
+                  <span className="address-chip-provider">{providerLabel}</span>
+                ) : null}
+                <span className="address-chip-addr">
+                  {shortArchAddress(reportedAccount.archAddress)}
+                </span>
+              </ExplorerLink>
+            ) : !cta ? null : (
+              <button
+                className="btn btn-primary connect-btn"
+                disabled={walletCtaDisabled(status, busy)}
+                onClick={runHeaderCta}
+              >
+                {busy && status.state !== "awaiting_wallet" ? "Waiting for wallet…" : cta.label}
               </button>
             )}
           </div>
         </div>
-        <nav className="nav" aria-label="ANS navigation">
-          <NavLink to="/" end>Search</NavLink>
-          <NavLink to="/register">Register</NavLink>
-          <NavLink to="/manage">Manage</NavLink>
-          <NavLink to="/names">My names</NavLink>
-        </nav>
       </header>
       <main className="page-content">
-        {error ? <p className="status-banner status-err">{error}</p> : null}
-        {!available ? (
-          <p className="status-banner status-warn">
-            Looking for Arch Wallet. Unlock the extension, allow it on this site, then refresh.
-            Search remains available without connecting.
-          </p>
+        {error && !cta ? (
+          <p className="wallet-error" role="alert">Wallet connection failed. {error}</p>
         ) : null}
         <Outlet />
       </main>
+      <footer className="site-footer">
+        <p>Arch Name Service · Testnet</p>
+        <nav aria-label="Support links">
+          <a href="https://github.com/Arch-Network/arch-name-service" target="_blank" rel="noreferrer">
+            Documentation
+          </a>
+          <a href="https://explorer.arch.network/testnet" target="_blank" rel="noreferrer">
+            Network status
+          </a>
+        </nav>
+      </footer>
     </div>
   );
 }
