@@ -1,6 +1,7 @@
 use ans_protocol::{
     derive::{
-        derive_config_address, derive_name_address, derive_record_address, derive_reverse_address,
+        derive_config_address, derive_name_address, derive_record_address,
+        derive_reverse_address, derive_text_record_address,
     },
     name::{canonicalize_name, name_hash},
     resolve::{resolve_owner, resolve_primary, resolve_record, AccountAt},
@@ -10,7 +11,9 @@ use ans_protocol::{
         NAME_ACCOUNT_DISCRIMINATOR, RECORD_ACCOUNT_DISCRIMINATOR, REGISTRY_CONFIG_DISCRIMINATOR,
         REVERSE_ACCOUNT_DISCRIMINATOR,
     },
-    validate::{derive_token_ata, encode_taproot_address, parse_taproot_address},
+    validate::{
+        derive_token_ata, encode_taproot_address, parse_taproot_address, validate_record_value,
+    },
     AnsError,
 };
 
@@ -214,4 +217,57 @@ fn token_records_must_use_the_configured_ata_derivation() {
         150,
     )
     .is_ok());
+}
+
+#[test]
+fn text_records_use_key_hashed_pdas_and_validate_shape() {
+    let (config, name) = named_accounts();
+    let key = "eth";
+    let value = RecordValue::Text {
+        key: key.to_owned(),
+        value: format!("0x{}", "ab".repeat(20)),
+    };
+    let record = AccountAt {
+        address: derive_text_record_address(
+            PROGRAM_ID,
+            &config.state.namespace,
+            name.state.name_hash,
+            key,
+        ),
+        state: RecordAccount {
+            header: AccountHeader::initialized(RECORD_ACCOUNT_DISCRIMINATOR),
+            name_hash: name.state.name_hash,
+            record_type: RecordType::Text,
+            owner_snapshot: OWNER,
+            record_epoch: name.state.record_epoch,
+            revision: 1,
+            value: value.clone(),
+            updated_at_slot: 120,
+        },
+    };
+    assert_eq!(
+        resolve_record(
+            PROGRAM_ID,
+            &config,
+            "alice.arch",
+            &name,
+            &record,
+            RecordType::Text,
+            150,
+        )
+        .unwrap(),
+        value
+    );
+    assert_eq!(
+        validate_record_value(
+            &config.state,
+            &name.state,
+            RecordType::Text,
+            &RecordValue::Text {
+                key: "ETH".into(),
+                value: "x".into(),
+            },
+        ),
+        Err(AnsError::InvalidTextRecord)
+    );
 }

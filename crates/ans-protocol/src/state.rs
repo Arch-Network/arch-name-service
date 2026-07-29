@@ -86,6 +86,10 @@ pub enum RecordType {
     ArchOwner,
     BitcoinTaproot,
     TokenAta,
+    /// Extensible UTF-8 profile / payment / content record (SNS-parity catalog).
+    /// PDA seeds include a domain-separated hash of the record key so many
+    /// Text rows can exist per name without growing this enum forever.
+    Text,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -98,6 +102,10 @@ pub enum RecordValue {
         token_id: ArchAddress,
         ata: ArchAddress,
     },
+    Text {
+        key: String,
+        value: String,
+    },
 }
 
 impl RecordValue {
@@ -106,6 +114,14 @@ impl RecordValue {
             Self::ArchOwner(_) => RecordType::ArchOwner,
             Self::BitcoinTaproot { .. } => RecordType::BitcoinTaproot,
             Self::TokenAta { .. } => RecordType::TokenAta,
+            Self::Text { .. } => RecordType::Text,
+        }
+    }
+
+    pub fn text_key(&self) -> Option<&str> {
+        match self {
+            Self::Text { key, .. } => Some(key.as_str()),
+            _ => None,
         }
     }
 }

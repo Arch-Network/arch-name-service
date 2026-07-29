@@ -34,6 +34,8 @@ pub enum AnsError {
     InvalidTokenAta,
     #[error("record value exceeds its type-specific maximum")]
     RecordValueTooLarge,
+    #[error("text record key or value is invalid")]
+    InvalidTextRecord,
     #[error("reverse account does not point to the active owner and name")]
     InvalidReverseBinding,
 }

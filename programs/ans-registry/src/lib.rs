@@ -2,16 +2,16 @@
 
 use ans_protocol::{
     derive::{
-        derive_config_address, derive_name_address, derive_record_address, derive_reverse_address,
-        namespace_hash,
+        derive_config_address, derive_name_address, derive_record_address_for_value,
+        derive_reverse_address, namespace_hash, record_key_hash,
     },
     instruction::NameInstruction,
     name::validate_label,
     state::{
         decode_state, encode_state, AccountHeader, ArchAddress, BitcoinNetwork, RecordAccount,
-        RegistryConfig, NAME_ACCOUNT_DISCRIMINATOR, REGISTRY_CONFIG_DISCRIMINATOR,
+        RecordType, RecordValue, RegistryConfig, NAME_ACCOUNT_DISCRIMINATOR,
+        REGISTRY_CONFIG_DISCRIMINATOR,
     },
-    RecordType,
 };
 use arch_program::{
     account::AccountInfo,
@@ -24,6 +24,7 @@ use arch_program::{
 use borsh::BorshDeserialize;
 
 mod availability;
+mod idl;
 mod transition;
 #[cfg(test)]
 mod transition_tests;
@@ -39,6 +40,12 @@ pub fn process_instruction<'a>(
     accounts: &'a [AccountInfo<'a>],
     instruction_data: &[u8],
 ) -> Result<(), ProgramError> {
+    // Anchor/Satellite IDL account protocol (Create/Write/Resize/…). Must be
+    // checked before Borsh NameInstruction decode so the 8-byte IDL selector
+    // is not mistaken for a registry instruction.
+    if let Some(result) = idl::try_process(program_id, accounts, instruction_data) {
+        return result;
+    }
     let instruction = NameInstruction::deserialize(&mut &instruction_data[..])
         .map_err(|_| ProgramError::InvalidInstructionData)?;
     match instruction {
@@ -62,6 +69,19 @@ pub fn process_instruction<'a>(
             name_hash,
             record_type,
             value,
+            expected_revision,
+        ),
+        NameInstruction::DeleteRecord {
+            name_hash,
+            record_type,
+            text_key,
+            expected_revision,
+        } => delete_record(
+            program_id,
+            accounts,
+            name_hash,
+            record_type,
+            text_key,
             expected_revision,
         ),
         NameInstruction::SetPrimary { name_hash } => set_primary(program_id, accounts, name_hash),
@@ -194,7 +214,7 @@ fn set_record(
     accounts: &[AccountInfo],
     name_hash: [u8; 32],
     record_type: RecordType,
-    value: ans_protocol::RecordValue,
+    value: RecordValue,
     expected_revision: u64,
 ) -> Result<(), ProgramError> {
     let iterator = &mut accounts.iter();
@@ -206,13 +226,19 @@ fn set_record(
     let config = load_config(program_id, config_account)?;
     let name = load_name(program_id, name_account, &config, name_hash)?;
     require_owner(owner, &name.owner)?;
+    let text_key_owned = value.text_key().map(str::to_owned);
+    let text_key = text_key_owned.as_deref();
+    if record_type == RecordType::Text && text_key.is_none() {
+        return Err(ProgramError::InvalidInstructionData);
+    }
     require_address(
         record_account,
-        derive_record_address(
+        derive_record_address_for_value(
             program_id.serialize(),
             &config.namespace,
             name_hash,
             record_type,
+            text_key,
         ),
     )?;
     let existing = if record_account.data_is_empty() {
@@ -235,29 +261,107 @@ fn set_record(
     if existing.is_none() {
         let namespace = namespace_hash(TESTNET_NAMESPACE);
         let record_kind = [record_type as u8];
-        let seeds = [
-            b"ans:record:v1".as_slice(),
-            namespace.as_slice(),
-            name_hash.as_slice(),
-            record_kind.as_slice(),
-        ];
+        let key_hash = text_key.map(record_key_hash);
         let bytes = encode_state(&record);
         if record_account.owner == program_id {
             // Resume a prior underfunded create.
         } else if record_account.data_is_empty() {
-            create_pda(
-                program_id,
-                owner,
-                record_account,
-                accounts,
-                &seeds,
-                bytes.len(),
-            )?;
+            if let Some(ref key_hash) = key_hash {
+                let seeds = [
+                    b"ans:record:v1".as_slice(),
+                    namespace.as_slice(),
+                    name_hash.as_slice(),
+                    record_kind.as_slice(),
+                    key_hash.as_slice(),
+                ];
+                create_pda(
+                    program_id,
+                    owner,
+                    record_account,
+                    accounts,
+                    &seeds,
+                    bytes.len(),
+                )?;
+            } else {
+                let seeds = [
+                    b"ans:record:v1".as_slice(),
+                    namespace.as_slice(),
+                    name_hash.as_slice(),
+                    record_kind.as_slice(),
+                ];
+                create_pda(
+                    program_id,
+                    owner,
+                    record_account,
+                    accounts,
+                    &seeds,
+                    bytes.len(),
+                )?;
+            }
         } else {
             return Err(ProgramError::IncorrectProgramId);
         }
     }
     store(owner, record_account, &record)
+}
+
+fn delete_record(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    name_hash: [u8; 32],
+    record_type: RecordType,
+    text_key: String,
+    expected_revision: u64,
+) -> Result<(), ProgramError> {
+    let iterator = &mut accounts.iter();
+    let owner = next_account_info(iterator)?;
+    let config_account = next_account_info(iterator)?;
+    let name_account = next_account_info(iterator)?;
+    let record_account = next_account_info(iterator)?;
+    require_signer(owner)?;
+    let config = load_config(program_id, config_account)?;
+    let name = load_name(program_id, name_account, &config, name_hash)?;
+    require_owner(owner, &name.owner)?;
+    let key_opt = match record_type {
+        RecordType::Text => {
+            if text_key.is_empty() {
+                return Err(ProgramError::InvalidInstructionData);
+            }
+            Some(text_key.as_str())
+        }
+        _ => {
+            if !text_key.is_empty() {
+                return Err(ProgramError::InvalidInstructionData);
+            }
+            None
+        }
+    };
+    require_address(
+        record_account,
+        derive_record_address_for_value(
+            program_id.serialize(),
+            &config.namespace,
+            name_hash,
+            record_type,
+            key_opt,
+        ),
+    )?;
+    if record_account.owner != program_id || record_account.data_is_empty() {
+        return Err(ProgramError::UninitializedAccount);
+    }
+    let existing = load::<RecordAccount>(record_account)?;
+    if existing.revision != expected_revision
+        || existing.record_type != record_type
+        || existing.name_hash != name_hash
+        || existing.owner_snapshot != name.owner
+        || existing.record_epoch != name.record_epoch
+    {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    if record_type == RecordType::Text && existing.value.text_key() != Some(text_key.as_str()) {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    record_account.realloc(0, false)
 }
 
 fn set_primary(

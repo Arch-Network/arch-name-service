@@ -1,0 +1,307 @@
+{
+  "address": "3d9fbaa282268d8453a924692f254ad6c610668f36512db9fb50325ac2e4e079",
+  "metadata": {
+    "name": "ans_registry",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Arch Name Service (.arch) testnet registry — native Borsh instructions (1-byte enum discriminators)."
+  },
+  "instructions": [
+    {
+      "name": "initialize_registry",
+      "discriminator": [0],
+      "docs": ["Initialize the one-time .arch registry config PDA."],
+      "accounts": [
+        { "name": "authority", "writable": true, "signer": true },
+        { "name": "config", "writable": true },
+        { "name": "system_program" }
+      ],
+      "args": [
+        { "name": "network_id", "type": "u32" },
+        { "name": "namespace_authority", "type": "pubkey" }
+      ]
+    },
+    {
+      "name": "register",
+      "discriminator": [1],
+      "docs": ["Permanently register a .arch label for the signer."],
+      "accounts": [
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "config" },
+        { "name": "name_account", "writable": true },
+        { "name": "system_program" }
+      ],
+      "args": [
+        { "name": "label", "type": "string" },
+        { "name": "duration_slots", "type": "u64" }
+      ]
+    },
+    {
+      "name": "renew",
+      "discriminator": [2],
+      "docs": ["Reserved — permanent registration has no renew path on testnet."],
+      "accounts": [],
+      "args": [
+        { "name": "name_hash", "type": "pubkey" },
+        { "name": "duration_slots", "type": "u64" }
+      ]
+    },
+    {
+      "name": "transfer",
+      "discriminator": [3],
+      "docs": ["Transfer name ownership; bumps record_epoch and invalidates prior records."],
+      "accounts": [
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "config" },
+        { "name": "name_account", "writable": true }
+      ],
+      "args": [
+        { "name": "name_hash", "type": "pubkey" },
+        { "name": "new_owner", "type": "pubkey" }
+      ]
+    },
+    {
+      "name": "set_record",
+      "discriminator": [4],
+      "docs": ["Create or update a typed/text record for a name."],
+      "accounts": [
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "config" },
+        { "name": "name_account" },
+        { "name": "record_account", "writable": true },
+        { "name": "system_program" }
+      ],
+      "args": [
+        { "name": "name_hash", "type": "pubkey" },
+        { "name": "record_type", "type": { "defined": { "name": "RecordType" } } },
+        { "name": "value", "type": { "defined": { "name": "RecordValue" } } },
+        { "name": "expected_revision", "type": "u64" }
+      ]
+    },
+    {
+      "name": "delete_record",
+      "discriminator": [5],
+      "docs": ["Delete a typed/text record."],
+      "accounts": [
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "config" },
+        { "name": "name_account" },
+        { "name": "record_account", "writable": true }
+      ],
+      "args": [
+        { "name": "name_hash", "type": "pubkey" },
+        { "name": "record_type", "type": { "defined": { "name": "RecordType" } } },
+        { "name": "text_key", "type": "string" },
+        { "name": "expected_revision", "type": "u64" }
+      ]
+    },
+    {
+      "name": "set_primary",
+      "discriminator": [6],
+      "docs": ["Bind the owner's reverse record to this name."],
+      "accounts": [
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "config" },
+        { "name": "name_account", "writable": true },
+        { "name": "reverse_account", "writable": true },
+        { "name": "system_program" }
+      ],
+      "args": [
+        { "name": "name_hash", "type": "pubkey" }
+      ]
+    },
+    {
+      "name": "clear_primary",
+      "discriminator": [7],
+      "docs": ["Clear the owner's reverse/primary binding."],
+      "accounts": [
+        { "name": "owner", "writable": true, "signer": true },
+        { "name": "reverse_account", "writable": true }
+      ],
+      "args": []
+    },
+    {
+      "name": "reclaim_expired",
+      "discriminator": [8],
+      "docs": ["Reserved — permanent registration has no reclaim path on testnet."],
+      "accounts": [],
+      "args": [
+        { "name": "label", "type": "string" },
+        { "name": "duration_slots", "type": "u64" }
+      ]
+    },
+    {
+      "name": "update_config",
+      "discriminator": [9],
+      "docs": ["Reserved admin config update (not enabled on testnet alpha)."],
+      "accounts": [],
+      "args": [
+        { "name": "paused", "type": { "option": "bool" } },
+        { "name": "grace_period_slots", "type": { "option": "u64" } }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "RegistryConfig",
+      "discriminator": [65, 78, 83, 67, 70, 71, 48, 49]
+    },
+    {
+      "name": "NameAccount",
+      "discriminator": [65, 78, 83, 78, 65, 77, 69, 49]
+    },
+    {
+      "name": "RecordAccount",
+      "discriminator": [65, 78, 83, 82, 69, 67, 82, 49]
+    },
+    {
+      "name": "ReverseAccount",
+      "discriminator": [65, 78, 83, 82, 69, 86, 82, 49]
+    }
+  ],
+  "types": [
+    {
+      "name": "RecordType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "ArchOwner" },
+          { "name": "BitcoinTaproot" },
+          { "name": "TokenAta" },
+          { "name": "Text" }
+        ]
+      }
+    },
+    {
+      "name": "RecordValue",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "ArchOwner",
+            "fields": ["pubkey"]
+          },
+          {
+            "name": "BitcoinTaproot",
+            "fields": [
+              { "name": "witness_program", "type": "pubkey" }
+            ]
+          },
+          {
+            "name": "TokenAta",
+            "fields": [
+              { "name": "token_id", "type": "pubkey" },
+              { "name": "ata", "type": "pubkey" }
+            ]
+          },
+          {
+            "name": "Text",
+            "fields": [
+              { "name": "key", "type": "string" },
+              { "name": "value", "type": "string" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "AccountHeader",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "discriminator", "type": { "array": ["u8", 8] } },
+          { "name": "initialized", "type": "bool" },
+          { "name": "state_version", "type": "u16" }
+        ]
+      }
+    },
+    {
+      "name": "BitcoinNetwork",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "Mainnet" },
+          { "name": "Testnet" },
+          { "name": "Signet" },
+          { "name": "Regtest" }
+        ]
+      }
+    },
+    {
+      "name": "TokenProgramConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "token_program_id", "type": "pubkey" },
+          { "name": "associated_token_program_id", "type": "pubkey" }
+        ]
+      }
+    },
+    {
+      "name": "RegistryConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "header", "type": { "defined": { "name": "AccountHeader" } } },
+          { "name": "program_version", "type": "u16" },
+          { "name": "network_id", "type": "u32" },
+          { "name": "namespace", "type": "string" },
+          { "name": "namespace_authority", "type": "pubkey" },
+          { "name": "grace_period_slots", "type": "u64" },
+          { "name": "min_registration_slots", "type": "u64" },
+          { "name": "max_registration_slots", "type": "u64" },
+          { "name": "bitcoin_network", "type": { "defined": { "name": "BitcoinNetwork" } } },
+          { "name": "token_programs", "type": { "vec": { "defined": { "name": "TokenProgramConfig" } } } },
+          { "name": "paused", "type": "bool" },
+          { "name": "mainnet_enabled", "type": "bool" }
+        ]
+      }
+    },
+    {
+      "name": "NameAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "header", "type": { "defined": { "name": "AccountHeader" } } },
+          { "name": "name_hash", "type": "pubkey" },
+          { "name": "canonical_label", "type": "string" },
+          { "name": "owner", "type": "pubkey" },
+          { "name": "registered_at_slot", "type": "u64" },
+          { "name": "expires_at_slot", "type": "u64" },
+          { "name": "record_epoch", "type": "u64" },
+          { "name": "primary_binding_nonce", "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "RecordAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "header", "type": { "defined": { "name": "AccountHeader" } } },
+          { "name": "name_hash", "type": "pubkey" },
+          { "name": "record_type", "type": { "defined": { "name": "RecordType" } } },
+          { "name": "owner_snapshot", "type": "pubkey" },
+          { "name": "record_epoch", "type": "u64" },
+          { "name": "revision", "type": "u64" },
+          { "name": "value", "type": { "defined": { "name": "RecordValue" } } },
+          { "name": "updated_at_slot", "type": "u64" }
+        ]
+      }
+    },
+    {
+      "name": "ReverseAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "header", "type": { "defined": { "name": "AccountHeader" } } },
+          { "name": "owner", "type": "pubkey" },
+          { "name": "primary_name_hash", "type": "pubkey" },
+          { "name": "binding_nonce", "type": "u64" },
+          { "name": "updated_at_slot", "type": "u64" }
+        ]
+      }
+    }
+  ],
+  "errors": []
+}

@@ -11,6 +11,11 @@ use crate::{
     },
 };
 
+/// Max UTF-8 bytes for a Text record key (SNS-style short identifiers).
+pub const MAX_TEXT_KEY_LEN: usize = 32;
+/// Max UTF-8 bytes for a Text record value payload.
+pub const MAX_TEXT_VALUE_LEN: usize = 256;
+
 pub fn is_active(name: &NameAccount, current_slot: u64) -> bool {
     current_slot < name.expires_at_slot
 }
@@ -51,6 +56,30 @@ pub fn encode_taproot_address(
     Ok(Address::from_witness_program(program, bitcoin_network(network)).to_string())
 }
 
+/// Validates a Text record key: lowercase ASCII `[a-z0-9_-]{1,32}`.
+pub fn validate_text_key(key: &str) -> Result<(), AnsError> {
+    if key.is_empty() || key.len() > MAX_TEXT_KEY_LEN {
+        return Err(AnsError::InvalidTextRecord);
+    }
+    if !key
+        .bytes()
+        .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'_' | b'-'))
+    {
+        return Err(AnsError::InvalidTextRecord);
+    }
+    Ok(())
+}
+
+pub fn validate_text_value(value: &str) -> Result<(), AnsError> {
+    if value.is_empty() || value.len() > MAX_TEXT_VALUE_LEN {
+        return Err(AnsError::InvalidTextRecord);
+    }
+    if !value.is_ascii() || value.bytes().any(|b| b < 0x20 || b == 0x7f) {
+        return Err(AnsError::InvalidTextRecord);
+    }
+    Ok(())
+}
+
 pub fn validate_record_value(
     config: &RegistryConfig,
     name: &NameAccount,
@@ -77,6 +106,10 @@ pub fn validate_record_value(
         RecordValue::TokenAta { token_id, ata } => {
             validate_token_ata(name.owner, *token_id, *ata, &config.token_programs)
         }
+        RecordValue::Text { key, value } => {
+            validate_text_key(key)?;
+            validate_text_value(value)
+        }
     }
 }
 
@@ -85,6 +118,8 @@ pub const fn max_record_value_len(record_type: RecordType) -> usize {
         RecordType::ArchOwner => 33,
         RecordType::BitcoinTaproot => 33,
         RecordType::TokenAta => 65,
+        // Borsh: u8 tag + 2×(u32 len + payload); key≤32, value≤256 → 1+4+32+4+256
+        RecordType::Text => 297,
     }
 }
 
