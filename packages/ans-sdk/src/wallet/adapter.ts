@@ -31,9 +31,8 @@ function bytesToHex(bytes: Uint8Array): string {
  *
  * `challenge` is the lowercase 64-char hex string produced by
  * `TextDecoder().decode(SanitizedMessageUtil.hash(message))`. The wallet
- * BIP-322-signs the UTF-8 bytes of that string. Arch requires the
- * resulting Schnorr signature to be low-S normalized via
- * `SignatureUtil.adjustSignature` before inclusion in the runtime tx.
+ * BIP-322-signs the UTF-8 bytes of that string. Returns the 64-byte Schnorr
+ * signature as hex for inclusion in the runtime tx (same bytes Arch verifies).
  */
 export function makeAnsSigner(walletSigner: AnsWalletSigner): TransactionSigner {
   return async (challenge: string): Promise<string> => {
@@ -46,6 +45,8 @@ export function makeAnsSigner(walletSigner: AnsWalletSigner): TransactionSigner 
         `Wallet returned a ${schnorrSig.length}-byte signature; expected 64 bytes`,
       );
     }
+    // Strip BIP-322 witness framing when present (66/67-byte forms). No-op for
+    // the 64-byte Schnorr payloads Arch Wallet returns from signArchMessageHash.
     const adjusted = SignatureUtil.adjustSignature(schnorrSig);
     if (adjusted.length !== 64) {
       throw new Error(

@@ -1,6 +1,7 @@
 import { bech32m } from "bech32";
 
 import { encodeRecordValue } from "./codec/state.js";
+import { MAX_TEXT_KEY_LEN, MAX_TEXT_VALUE_LEN } from "./constants.js";
 import { deriveTokenAta } from "./derive.js";
 import { AnsError } from "./errors.js";
 import { bytesEqual } from "./hex.js";
@@ -72,6 +73,29 @@ export function maxRecordValueLen(recordType: RecordType): number {
       return 33;
     case "TokenAta":
       return 65;
+    case "Text":
+      return 297;
+  }
+}
+
+export function validateTextKey(key: string): void {
+  if (!key || key.length > MAX_TEXT_KEY_LEN) {
+    throw new AnsError("InvalidTextRecord");
+  }
+  if (![...key].every((c) => /[a-z0-9_-]/.test(c))) {
+    throw new AnsError("InvalidTextRecord");
+  }
+}
+
+export function validateTextValue(value: string): void {
+  if (!value || value.length > MAX_TEXT_VALUE_LEN) {
+    throw new AnsError("InvalidTextRecord");
+  }
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20 || code > 0x7e) {
+      throw new AnsError("InvalidTextRecord");
+    }
   }
 }
 
@@ -116,6 +140,10 @@ export function validateRecordValue(
       return;
     case "TokenAta":
       validateTokenAta(name.owner, value.tokenId, value.ata, config.tokenPrograms);
+      return;
+    case "Text":
+      validateTextKey(value.key);
+      validateTextValue(value.value);
       return;
   }
 }

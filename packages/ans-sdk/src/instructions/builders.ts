@@ -2,7 +2,7 @@ import { encodeInstruction } from "../codec/instruction.js";
 import { SYSTEM_PROGRAM_ID } from "../constants.js";
 import {
   deriveNameAddress,
-  deriveRecordAddress,
+  deriveRecordAddressFor,
   deriveReverseAddress,
 } from "../derive.js";
 import { nameHash } from "../name.js";
@@ -80,11 +80,13 @@ export function buildSetRecordInstruction(params: {
 }): BuiltInstruction {
   const hash = nameHash(params.name);
   const nameAccount = deriveNameAddress(params.programId, params.namespace, hash);
-  const recordAccount = deriveRecordAddress(
+  const textKey = params.value.kind === "Text" ? params.value.key : undefined;
+  const recordAccount = deriveRecordAddressFor(
     params.programId,
     params.namespace,
     hash,
     params.recordType,
+    textKey,
   );
   return {
     programId: params.programId,
@@ -100,6 +102,43 @@ export function buildSetRecordInstruction(params: {
       nameHash: hash,
       recordType: params.recordType,
       value: params.value,
+      expectedRevision: params.expectedRevision,
+    }),
+  };
+}
+
+export function buildDeleteRecordInstruction(params: {
+  programId: ArchAddress;
+  owner: ArchAddress;
+  registryConfig: ArchAddress;
+  namespace: string;
+  name: string;
+  recordType: RecordType;
+  textKey?: string;
+  expectedRevision: bigint;
+}): BuiltInstruction {
+  const hash = nameHash(params.name);
+  const nameAccount = deriveNameAddress(params.programId, params.namespace, hash);
+  const recordAccount = deriveRecordAddressFor(
+    params.programId,
+    params.namespace,
+    hash,
+    params.recordType,
+    params.textKey,
+  );
+  return {
+    programId: params.programId,
+    accounts: [
+      meta(params.owner, true, true),
+      meta(params.registryConfig, false, false),
+      meta(nameAccount, false, false),
+      meta(recordAccount, false, true),
+    ],
+    data: encodeInstruction({
+      kind: "DeleteRecord",
+      nameHash: hash,
+      recordType: params.recordType,
+      textKey: params.textKey ?? "",
       expectedRevision: params.expectedRevision,
     }),
   };

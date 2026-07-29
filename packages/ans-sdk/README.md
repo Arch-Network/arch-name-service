@@ -19,7 +19,7 @@ import {
 
 const client = new AnsClient(
   loadTestnetManifest(),
-  createArchRpcTransport("https://rpc.testnet.arch.network"),
+  createArchRpcTransport("https://id.arch.network/rpc"),
 );
 
 const owner = await client.resolveOwner("alice.arch");

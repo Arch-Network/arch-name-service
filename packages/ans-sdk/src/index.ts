@@ -40,13 +40,16 @@ export {
   deriveConfigAddress,
   deriveNameAddress,
   deriveRecordAddress,
+  deriveRecordAddressFor,
   deriveReverseAddress,
+  deriveTextRecordAddress,
   deriveTokenAta,
 } from "./derive.js";
 export { AnsError, type AnsErrorCode } from "./errors.js";
 export { bytesEqual, bytesToHex, hexToBytes } from "./hex.js";
 export {
   buildClearPrimaryInstruction,
+  buildDeleteRecordInstruction,
   buildRegisterInstruction,
   buildSetPrimaryInstruction,
   buildSetRecordInstruction,
@@ -54,11 +57,35 @@ export {
 } from "./instructions/builders.js";
 export { canonicalizeName, nameHash, validateLabel } from "./name.js";
 export {
+  TEXT_RECORD_CATALOG,
+  manifestSupportsTextRecords,
+  textRecordSpec,
+  validateTextRecordInput,
+  type TextRecordCategory,
+  type TextRecordKey,
+  type TextRecordSpec,
+} from "./records/catalog.js";
+export {
   resolveOwner,
   resolvePrimary,
   resolveRecord,
 } from "./resolve.js";
-export { createArchRpcTransport, normalizeRuntimeTransaction } from "./transport/arch-rpc.js";
+export {
+  ArchRpcError,
+  createArchRpcTransport,
+  isTransactionNotIndexedError,
+} from "./transport/arch-rpc.js";
+export {
+  createExplorerRestTransport,
+  type ExplorerRestOptions,
+  type ExplorerRestTransport,
+} from "./transport/explorer-rest.js";
+export { createSplitAnsTransport } from "./transport/split.js";
+export {
+  archRpcParams,
+  normalizeRuntimeTransaction,
+  type AccountFilter,
+} from "./transport/rpc-params.js";
 export type {
   AccountInfo,
   AnsTransport,
@@ -66,10 +93,18 @@ export type {
   ProgramAccountEntry,
 } from "./transport/types.js";
 export { buildTransaction } from "./transactions/builder.js";
+export {
+  DEFAULT_CONFIRM_TIMEOUT_MS,
+  TransactionPendingError,
+  isTransactionPendingError,
+  waitForTransaction,
+  type ConfirmOutcome,
+} from "./transactions/confirm.js";
 export { signAndSendInstruction } from "./transactions/runner.js";
 export type {
   AccountAt,
   AccountMeta,
+  AnsDeploymentFeatures,
   AnsDeploymentManifest,
   ArchAddress,
   BitcoinNetwork,
@@ -88,5 +123,7 @@ export {
   maxRecordValueLen,
   parseTaprootAddress,
   validateRecordValue,
+  validateTextKey,
+  validateTextValue,
 } from "./validate.js";
 export { makeAnsSigner, type AnsWalletSigner, type TransactionSigner } from "./wallet/adapter.js";

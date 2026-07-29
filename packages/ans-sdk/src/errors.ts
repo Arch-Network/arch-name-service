@@ -15,6 +15,7 @@ export type AnsErrorCode =
   | "InvalidTaprootAddress"
   | "InvalidTokenAta"
   | "RecordValueTooLarge"
+  | "InvalidTextRecord"
   | "InvalidReverseBinding"
   | "CodecError"
   | "AccountNotFound"

@@ -6,7 +6,7 @@ import {
   RECORD_SEED,
   REVERSE_SEED,
 } from "./constants.js";
-import { namespaceHash } from "./hash.js";
+import { namespaceHash, recordKeyHash } from "./hash.js";
 import type { ArchAddress, RecordType } from "./types.js";
 
 function encodeU32LE(value: number): Uint8Array {
@@ -23,6 +23,8 @@ function recordTypeByte(recordType: RecordType): number {
       return 1;
     case "TokenAta":
       return 2;
+    case "Text":
+      return 3;
   }
 }
 
@@ -59,11 +61,12 @@ export function deriveNameAddress(
   return derive(programId, [NAME_SEED, namespaceHash(namespace), nameHashBytes]);
 }
 
+/** Typed records only (ArchOwner / BitcoinTaproot / TokenAta). */
 export function deriveRecordAddress(
   programId: ArchAddress,
   namespace: string,
   nameHashBytes: Uint8Array,
-  recordType: RecordType,
+  recordType: Exclude<RecordType, "Text">,
 ): ArchAddress {
   return derive(programId, [
     RECORD_SEED,
@@ -71,6 +74,37 @@ export function deriveRecordAddress(
     nameHashBytes,
     Uint8Array.of(recordTypeByte(recordType)),
   ]);
+}
+
+export function deriveTextRecordAddress(
+  programId: ArchAddress,
+  namespace: string,
+  nameHashBytes: Uint8Array,
+  key: string,
+): ArchAddress {
+  return derive(programId, [
+    RECORD_SEED,
+    namespaceHash(namespace),
+    nameHashBytes,
+    Uint8Array.of(recordTypeByte("Text")),
+    recordKeyHash(key),
+  ]);
+}
+
+export function deriveRecordAddressFor(
+  programId: ArchAddress,
+  namespace: string,
+  nameHashBytes: Uint8Array,
+  recordType: RecordType,
+  textKey?: string,
+): ArchAddress {
+  if (recordType === "Text") {
+    if (!textKey) {
+      throw new Error("Text records require a key");
+    }
+    return deriveTextRecordAddress(programId, namespace, nameHashBytes, textKey);
+  }
+  return deriveRecordAddress(programId, namespace, nameHashBytes, recordType);
 }
 
 export function deriveReverseAddress(
