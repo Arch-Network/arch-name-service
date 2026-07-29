@@ -23,6 +23,7 @@ use arch_program::{
 };
 use borsh::BorshDeserialize;
 
+mod availability;
 mod transition;
 #[cfg(test)]
 mod transition_tests;
@@ -142,21 +143,6 @@ fn register(
         name_account,
         derive_name_address(program_id.serialize(), &config.namespace, name.name_hash),
     )?;
-    if name_account.owner == program_id && !name_account.data_is_empty() {
-        if load::<ans_protocol::NameAccount>(name_account)
-            .ok()
-            .and_then(|existing| {
-                existing
-                    .header
-                    .validate(NAME_ACCOUNT_DISCRIMINATOR)
-                    .ok()
-                    .map(|_| true)
-            })
-            .unwrap_or(false)
-        {
-            return Err(ProgramError::AccountAlreadyInitialized);
-        }
-    }
     let namespace = namespace_hash(TESTNET_NAMESPACE);
     let seeds = [
         b"ans:name:v1".as_slice(),
@@ -164,8 +150,16 @@ fn register(
         name.name_hash.as_slice(),
     ];
     let bytes = encode_state(&name);
+    // One PDA per canonical name. Initialized accounts are permanently taken on
+    // testnet; only empty/zeroed incomplete creates may be resumed.
     if name_account.owner == program_id {
-        // Resume a prior underfunded create.
+        match availability::ensure_program_owned_name_available(&name_account.data.borrow()) {
+            Ok(()) => {}
+            Err(ans_protocol::AnsError::NameTaken) => {
+                return Err(ProgramError::AccountAlreadyInitialized);
+            }
+            Err(_) => return Err(ProgramError::InvalidAccountData),
+        }
     } else if name_account.data_is_empty() {
         create_pda(program_id, owner, name_account, accounts, &seeds, bytes.len())?;
     } else {
