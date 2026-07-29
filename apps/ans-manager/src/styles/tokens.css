@@ -1,0 +1,85 @@
+@font-face {
+  font-family: "Newsreader";
+  src: url("/fonts/newsreader.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  src: url("/fonts/hanken-grotesk.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono.woff2") format("woff2");
+  font-weight: 400 500;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --color-primary: #e8590c;
+  --color-primary-hover: #cf4f0a;
+  --color-primary-tint: #fcefe7;
+  --color-positive: #16a34a;
+  --color-negative: #dc2626;
+  --color-warning: #e6a817;
+  --surface-app: #eeeef0;
+  --surface-card: #ffffff;
+  --surface-header: #ffffff;
+  --surface-subtle: #f1f1f3;
+  --surface-input: #f4f4f6;
+  --text-primary: #16161a;
+  --text-secondary: #6e6e76;
+  --text-muted: #9a9aa2;
+  --text-placeholder: #b0b0b8;
+  --text-mono: #3a3a40;
+  --border-card: #e5e5e8;
+  --border-field: #e0e0e4;
+  --border-divider: #ececef;
+  --radius-pill: 999px;
+  --radius-card: 16px;
+  --radius-field: 14px;
+  --radius-input: 12px;
+  --radius-chip: 8px;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-input: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --font-display: "Newsreader", Georgia, serif;
+  --font-body: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", monospace;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-primary: #f2640f;
+  --color-primary-hover: #ff7a2e;
+  --color-primary-tint: #2a1a10;
+  --surface-app: #0d0d0f;
+  --surface-card: #16161a;
+  --surface-header: #121214;
+  --surface-subtle: #1c1c20;
+  --surface-input: #1c1c20;
+  --text-primary: #f3f2ee;
+  --text-secondary: #8a8a92;
+  --text-muted: #6e6e76;
+  --text-placeholder: #6e6e76;
+  --text-mono: #c9c9cf;
+  --border-card: #26262b;
+  --border-field: #2a2a30;
+  --border-divider: #232328;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --shadow-input: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { min-height: 100%; }
+body {
+  font-family: var(--font-body);
+  background: var(--surface-app);
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+a { color: inherit; text-decoration: none; }
+button, input, select { font: inherit; }
+.mono { font-family: var(--font-mono); }

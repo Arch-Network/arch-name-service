@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/ans-protocol", "programs/ans-registry"]
+members = ["crates/ans-protocol", "programs/ans-registry", "tools/ans-fixtures"]
 resolver = "2"
 
 [workspace.package]

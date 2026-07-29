@@ -1,0 +1,13 @@
+{
+  "domain": "id.arch.network",
+  "account": "920373001452",
+  "region": "us-east-1",
+  "hostedZoneId": "Z1010690127K5I1CNQ3QF",
+  "bucket": "ansmanagerstack-sitebucket397a1860-rsfm1tvvqd92",
+  "distributionId": "E22LDGO96BLE0F",
+  "distributionDomain": "d26kpq2jxx69vh.cloudfront.net",
+  "deployRoleArn": "arn:aws:iam::920373001452:role/AnsManagerStack-GitHubDeployRoleED73FD64-UHSNglsHFV9X",
+  "siteUrl": "https://id.arch.network",
+  "deployedAt": "2026-07-27T03:35:00Z",
+  "sdkVersion": "0.1.0-testnet.0"
+}

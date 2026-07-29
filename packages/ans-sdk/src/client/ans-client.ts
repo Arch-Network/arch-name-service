@@ -1,0 +1,329 @@
+import {
+  classifyNameAccountData,
+  duplicateRegistrationError,
+  type NameAvailability,
+} from "../availability.js";
+import {
+  decodeNameAccount,
+  decodeRecordAccount,
+  decodeRegistryConfig,
+  decodeReverseAccount,
+  NAME_ACCOUNT_DISCRIMINATOR,
+  RECORD_ACCOUNT_DISCRIMINATOR,
+  REGISTRY_CONFIG_DISCRIMINATOR,
+  REVERSE_ACCOUNT_DISCRIMINATOR,
+  validateHeader,
+} from "../codec/state.js";
+import {
+  assertManifestConsistency,
+  programIdBytes,
+  registryConfigBytes,
+} from "../config/manifest.js";
+import {
+  deriveNameAddress,
+  deriveRecordAddress,
+  deriveReverseAddress,
+} from "../derive.js";
+import { AnsError } from "../errors.js";
+import { bytesEqual, bytesToHex } from "../hex.js";
+import {
+  buildClearPrimaryInstruction,
+  buildRegisterInstruction,
+  buildSetPrimaryInstruction,
+  buildSetRecordInstruction,
+  buildTransferInstruction,
+} from "../instructions/builders.js";
+import { canonicalizeName, nameHash } from "../name.js";
+import {
+  resolveOwner,
+  resolvePrimary,
+  resolveRecord,
+} from "../resolve.js";
+import type { AnsTransport } from "../transport/types.js";
+import type {
+  AnsDeploymentManifest,
+  ArchAddress,
+  BuiltInstruction,
+  NameAccount,
+  RecordAccount,
+  RecordType,
+  RecordValue,
+  RegistryConfig,
+  ReverseAccount,
+} from "../types.js";
+
+export interface NameAvailabilityResult {
+  canonical: string;
+  availability: NameAvailability;
+  account: NameAccount | null;
+}
+
+export class AnsClient {
+  readonly programId: ArchAddress;
+  readonly registryConfigAddress: ArchAddress;
+
+  constructor(
+    readonly manifest: AnsDeploymentManifest,
+    readonly transport: AnsTransport,
+  ) {
+    assertManifestConsistency(manifest);
+    this.programId = programIdBytes(manifest);
+    this.registryConfigAddress = registryConfigBytes(manifest);
+  }
+
+  async fetchRegistryConfig(): Promise<RegistryConfig> {
+    const account = await this.transport.readAccountInfo(this.registryConfigAddress);
+    if (!account) throw new AnsError("AccountNotFound", "registry config missing");
+    if (!bytesEqual(account.owner, this.programId)) {
+      throw new AnsError("IncorrectProgramId");
+    }
+    const config = decodeRegistryConfig(account.data);
+    validateHeader(config.header, REGISTRY_CONFIG_DISCRIMINATOR);
+    return config;
+  }
+
+  async fetchNameAccount(name: string): Promise<NameAccount | null> {
+    const status = await this.getNameAvailability(name);
+    if (status.availability === "taken") return status.account;
+    if (status.availability === "available") return null;
+    throw new AnsError(
+      "UnsupportedAccountVersion",
+      `${status.canonical} name account is present but not a valid registration`,
+    );
+  }
+
+  /**
+   * Client-side registration gate. Missing/blank PDAs are available; initialized
+   * NameAccounts are taken. Non-blank junk is unavailable (do not register into it).
+   */
+  async getNameAvailability(name: string): Promise<NameAvailabilityResult> {
+    const canonical = canonicalizeName(name);
+    const hash = nameHash(canonical);
+    const address = deriveNameAddress(this.programId, this.manifest.namespace, hash);
+    const accountInfo = await this.transport.readAccountInfo(address);
+    if (!accountInfo || accountInfo.data.length === 0) {
+      return { canonical, availability: "available", account: null };
+    }
+    if (!bytesEqual(accountInfo.owner, this.programId)) {
+      throw new AnsError("IncorrectProgramId");
+    }
+    const classified = classifyNameAccountData(accountInfo.data);
+    return { canonical, ...classified };
+  }
+
+  /** Throws `NameTaken` when the canonical name is already registered. */
+  async assertNameAvailable(name: string): Promise<string> {
+    const status = await this.getNameAvailability(name);
+    if (status.availability === "taken") {
+      throw duplicateRegistrationError(status.canonical);
+    }
+    if (status.availability === "unavailable") {
+      throw new AnsError(
+        "UnsupportedAccountVersion",
+        `${status.canonical} cannot be registered (invalid on-chain name account)`,
+      );
+    }
+    return status.canonical;
+  }
+
+  async resolveOwner(name: string): Promise<ArchAddress> {
+    const config = await this.fetchRegistryConfig();
+    const hash = nameHash(name);
+    const address = deriveNameAddress(this.programId, this.manifest.namespace, hash);
+    const account = await this.transport.readAccountInfo(address);
+    if (!account) throw new AnsError("AccountNotFound", `name account for ${name}`);
+    const slot = await this.transport.getCurrentSlot();
+    return resolveOwner(
+      this.programId,
+      { address: this.registryConfigAddress, state: config },
+      name,
+      { address, state: decodeNameAccount(account.data) },
+      slot,
+    );
+  }
+
+  async resolveRecord(name: string, recordType: RecordType): Promise<RecordValue> {
+    const config = await this.fetchRegistryConfig();
+    const hash = nameHash(name);
+    const nameAddress = deriveNameAddress(this.programId, this.manifest.namespace, hash);
+    const recordAddress = deriveRecordAddress(
+      this.programId,
+      this.manifest.namespace,
+      hash,
+      recordType,
+    );
+    const [nameAccount, recordAccount] = await Promise.all([
+      this.transport.readAccountInfo(nameAddress),
+      this.transport.readAccountInfo(recordAddress),
+    ]);
+    if (!nameAccount) throw new AnsError("AccountNotFound", `name account for ${name}`);
+    if (!recordAccount) throw new AnsError("AccountNotFound", `record account for ${name}`);
+    const slot = await this.transport.getCurrentSlot();
+    return resolveRecord(
+      this.programId,
+      { address: this.registryConfigAddress, state: config },
+      name,
+      { address: nameAddress, state: decodeNameAccount(nameAccount.data) },
+      { address: recordAddress, state: decodeRecordAccount(recordAccount.data) },
+      recordType,
+      slot,
+    );
+  }
+
+  async resolvePrimary(owner: ArchAddress): Promise<string | null> {
+    const config = await this.fetchRegistryConfig();
+    const reverseAddress = deriveReverseAddress(
+      this.programId,
+      this.manifest.namespace,
+      owner,
+    );
+    const reverseAccount = await this.transport.readAccountInfo(reverseAddress);
+    if (!reverseAccount || reverseAccount.data.length === 0) return null;
+    const reverse = decodeReverseAccount(reverseAccount.data);
+    validateHeader(reverse.header, REVERSE_ACCOUNT_DISCRIMINATOR);
+    const nameAddress = deriveNameAddress(
+      this.programId,
+      this.manifest.namespace,
+      reverse.primaryNameHash,
+    );
+    const nameAccount = await this.transport.readAccountInfo(nameAddress);
+    if (!nameAccount) return null;
+    const slot = await this.transport.getCurrentSlot();
+    try {
+      return resolvePrimary(
+        this.programId,
+        { address: this.registryConfigAddress, state: config },
+        { address: reverseAddress, state: reverse },
+        { address: nameAddress, state: decodeNameAccount(nameAccount.data) },
+        slot,
+      );
+    } catch (error) {
+      if (error instanceof AnsError && error.code === "InvalidReverseBinding") {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  async listOwnedNames(owner: ArchAddress): Promise<Array<{ name: string; account: NameAccount }>> {
+    if (!this.transport.getProgramAccounts) {
+      throw new AnsError("CodecError", "transport does not support getProgramAccounts");
+    }
+    const entries = await this.transport.getProgramAccounts(this.programId, [
+      { DataContent: { offset: 0, bytes: Array.from(NAME_ACCOUNT_DISCRIMINATOR) } },
+    ]);
+    const owned: Array<{ name: string; account: NameAccount }> = [];
+    for (const entry of entries) {
+      if (!bytesEqual(entry.account.owner, this.programId)) continue;
+      try {
+        const account = decodeNameAccount(entry.account.data);
+        validateHeader(account.header, NAME_ACCOUNT_DISCRIMINATOR);
+        if (!bytesEqual(account.owner, owner)) continue;
+        const name = canonicalizeName(`${account.canonicalLabel}.arch`);
+        const expected = deriveNameAddress(
+          this.programId,
+          this.manifest.namespace,
+          account.nameHash,
+        );
+        if (!bytesEqual(expected, entry.pubkey)) continue;
+        owned.push({ name, account });
+      } catch {
+        // Skip non-name or invalid accounts.
+      }
+    }
+    return owned;
+  }
+
+  buildRegister(owner: ArchAddress, label: string): BuiltInstruction {
+    return buildRegisterInstruction({
+      programId: this.programId,
+      owner,
+      registryConfig: this.registryConfigAddress,
+      namespace: this.manifest.namespace,
+      label,
+    });
+  }
+
+  buildTransfer(owner: ArchAddress, name: string, newOwner: ArchAddress): BuiltInstruction {
+    return buildTransferInstruction({
+      programId: this.programId,
+      owner,
+      registryConfig: this.registryConfigAddress,
+      namespace: this.manifest.namespace,
+      name,
+      newOwner,
+    });
+  }
+
+  buildSetRecord(
+    owner: ArchAddress,
+    name: string,
+    recordType: RecordType,
+    value: RecordValue,
+    expectedRevision: bigint,
+  ): BuiltInstruction {
+    return buildSetRecordInstruction({
+      programId: this.programId,
+      owner,
+      registryConfig: this.registryConfigAddress,
+      namespace: this.manifest.namespace,
+      name,
+      recordType,
+      value,
+      expectedRevision,
+    });
+  }
+
+  buildSetPrimary(owner: ArchAddress, name: string): BuiltInstruction {
+    return buildSetPrimaryInstruction({
+      programId: this.programId,
+      owner,
+      registryConfig: this.registryConfigAddress,
+      namespace: this.manifest.namespace,
+      name,
+    });
+  }
+
+  buildClearPrimary(owner: ArchAddress): BuiltInstruction {
+    return buildClearPrimaryInstruction({
+      programId: this.programId,
+      owner,
+      namespace: this.manifest.namespace,
+    });
+  }
+
+  async fetchRecord(
+    name: string,
+    recordType: RecordType,
+  ): Promise<RecordAccount | null> {
+    const hash = nameHash(name);
+    const address = deriveRecordAddress(
+      this.programId,
+      this.manifest.namespace,
+      hash,
+      recordType,
+    );
+    const account = await this.transport.readAccountInfo(address);
+    if (!account || account.data.length === 0) return null;
+    const decoded = decodeRecordAccount(account.data);
+    validateHeader(decoded.header, RECORD_ACCOUNT_DISCRIMINATOR);
+    return decoded;
+  }
+
+  async fetchReverse(owner: ArchAddress): Promise<ReverseAccount | null> {
+    const address = deriveReverseAddress(
+      this.programId,
+      this.manifest.namespace,
+      owner,
+    );
+    const account = await this.transport.readAccountInfo(address);
+    if (!account || account.data.length === 0) return null;
+    const decoded = decodeReverseAccount(account.data);
+    validateHeader(decoded.header, REVERSE_ACCOUNT_DISCRIMINATOR);
+    return decoded;
+  }
+
+  ownerHex(owner: ArchAddress): string {
+    return bytesToHex(owner);
+  }
+}

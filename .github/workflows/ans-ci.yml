@@ -24,3 +24,29 @@ jobs:
 
       - name: Run protocol and registry unit tests
         run: cargo test --locked -p ans-protocol -p ans-registry
+
+      - name: Regenerate ANS fixtures and fail on drift
+        run: |
+          cargo run --locked -p ans-fixtures -- packages/ans-sdk/fixtures
+          git diff --exit-code packages/ans-sdk/fixtures/
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/ans-sdk/package-lock.json
+
+      - name: Install and test TypeScript SDK
+        working-directory: packages/ans-sdk
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Install and test ANS manager
+        working-directory: apps/ans-manager
+        run: |
+          npm ci
+          npm test
+          npm run build

@@ -1,0 +1,73 @@
+name: deploy-ans-manager
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_domain:
+        description: "Type id.arch.network to confirm deploy target"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-ans-manager
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ inputs.confirm_domain == 'id.arch.network' }}
+    runs-on: ubuntu-latest
+    environment: ans-manager
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build SDK and manager
+        run: |
+          cd packages/ans-sdk && npm ci && npm run build
+          cd ../../apps/ans-manager && npm ci && npm run build
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.ANS_MANAGER_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Sync static assets
+        env:
+          BUCKET: ${{ secrets.ANS_MANAGER_BUCKET_NAME }}
+          DISTRIBUTION_ID: ${{ secrets.ANS_MANAGER_DISTRIBUTION_ID }}
+        run: |
+          set -euo pipefail
+          aws s3 sync apps/ans-manager/dist "s3://${BUCKET}" \
+            --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude "index.html"
+          aws s3 cp apps/ans-manager/dist/index.html "s3://${BUCKET}/index.html" \
+            --cache-control "public,max-age=60,must-revalidate" \
+            --content-type "text/html"
+          aws cloudfront create-invalidation \
+            --distribution-id "$DISTRIBUTION_ID" \
+            --paths "/index.html" "/"
+
+      - name: Write deploy evidence
+        run: |
+          mkdir -p deployments
+          cat > deployments/ans-manager-deploy.json <<EOF
+          {
+            "domain": "id.arch.network",
+            "commit": "${{ github.sha }}",
+            "deployedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ans-manager-deploy-evidence
+          path: deployments/ans-manager-deploy.json

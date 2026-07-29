@@ -1,0 +1,40 @@
+{
+  "network": "testnet",
+  "rpcUrl": "https://rpc.testnet.arch.network",
+  "programId": "3d9fbaa282268d8453a924692f254ad6c610668f36512db9fb50325ac2e4e079",
+  "registryConfig": "29691c11fb04be3e25c5f236dc7971cbb3293fc0f7a3bed288dc4cd476320521",
+  "networkId": 2,
+  "namespace": ".arch",
+  "programVersion": 1,
+  "bitcoinNetwork": "testnet",
+  "tokenPrograms": [],
+  "mainnetEnabled": false,
+  "smokePassed": true,
+  "smokeEvidence": {
+    "label": "smoke1785070093",
+    "canonicalName": "smoke1785070093.arch",
+    "owner": "58781370584ec88839f92697cb9f8cf480f6cdc810dd393e17123676ba0c313c",
+    "newOwner": "528f0c10f6b6438ffb09359a12f546b839d80785acbde339fe91f57e982cc831",
+    "nameAccount": "8df8bc9e19d0b1504f61430d16bc03464fd8e6586ce7c1d5451cde15888986d0",
+    "recordAccount": "7c14d3a583514478bc5212798f82cd142086bf2aaf4ab7564bb13b6a9d62d09b",
+    "reverseAccount": "c2ec33d8318d64d2428a4c90c187c18d4e4109e50a013c9f0f73955cfec3fb0c",
+    "transactions": [
+      {
+        "operation": "smoke_register",
+        "txid": "26831f6053c40d347708672510bded9158d8f5d8a1c22bf87cead3702f3e2f86"
+      },
+      {
+        "operation": "smoke_set_record",
+        "txid": "7794168b79c3d49d95b9be23abc8630b640aafbeb4324a26689442b79a36fdb0"
+      },
+      {
+        "operation": "smoke_set_primary",
+        "txid": "5f1eb131548f67ce6a3591eeae11d505097e6d982a824123bb38e02d32e04363"
+      },
+      {
+        "operation": "smoke_transfer",
+        "txid": "1426070f96185595c2f69082d88bc3b4c819e34f766f6379bb74be5ea2bf8656"
+      }
+    ]
+  }
+}
