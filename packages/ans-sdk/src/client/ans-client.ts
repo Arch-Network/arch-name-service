@@ -1,4 +1,9 @@
 import {
+  classifyNameAccountData,
+  duplicateRegistrationError,
+  type NameAvailability,
+} from "../availability.js";
+import {
   decodeNameAccount,
   decodeRecordAccount,
   decodeRegistryConfig,
@@ -47,6 +52,12 @@ import type {
   ReverseAccount,
 } from "../types.js";
 
+export interface NameAvailabilityResult {
+  canonical: string;
+  availability: NameAvailability;
+  account: NameAccount | null;
+}
+
 export class AnsClient {
   readonly programId: ArchAddress;
   readonly registryConfigAddress: ArchAddress;
@@ -72,16 +83,47 @@ export class AnsClient {
   }
 
   async fetchNameAccount(name: string): Promise<NameAccount | null> {
-    const hash = nameHash(name);
+    const status = await this.getNameAvailability(name);
+    if (status.availability === "taken") return status.account;
+    if (status.availability === "available") return null;
+    throw new AnsError(
+      "UnsupportedAccountVersion",
+      `${status.canonical} name account is present but not a valid registration`,
+    );
+  }
+
+  /**
+   * Client-side registration gate. Missing/blank PDAs are available; initialized
+   * NameAccounts are taken. Non-blank junk is unavailable (do not register into it).
+   */
+  async getNameAvailability(name: string): Promise<NameAvailabilityResult> {
+    const canonical = canonicalizeName(name);
+    const hash = nameHash(canonical);
     const address = deriveNameAddress(this.programId, this.manifest.namespace, hash);
-    const account = await this.transport.readAccountInfo(address);
-    if (!account || account.data.length === 0) return null;
-    if (!bytesEqual(account.owner, this.programId)) {
+    const accountInfo = await this.transport.readAccountInfo(address);
+    if (!accountInfo || accountInfo.data.length === 0) {
+      return { canonical, availability: "available", account: null };
+    }
+    if (!bytesEqual(accountInfo.owner, this.programId)) {
       throw new AnsError("IncorrectProgramId");
     }
-    const decoded = decodeNameAccount(account.data);
-    validateHeader(decoded.header, NAME_ACCOUNT_DISCRIMINATOR);
-    return decoded;
+    const classified = classifyNameAccountData(accountInfo.data);
+    return { canonical, ...classified };
+  }
+
+  /** Throws `NameTaken` when the canonical name is already registered. */
+  async assertNameAvailable(name: string): Promise<string> {
+    const status = await this.getNameAvailability(name);
+    if (status.availability === "taken") {
+      throw duplicateRegistrationError(status.canonical);
+    }
+    if (status.availability === "unavailable") {
+      throw new AnsError(
+        "UnsupportedAccountVersion",
+        `${status.canonical} cannot be registered (invalid on-chain name account)`,
+      );
+    }
+    return status.canonical;
   }
 
   async resolveOwner(name: string): Promise<ArchAddress> {
