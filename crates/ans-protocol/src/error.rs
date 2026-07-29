@@ -18,6 +18,8 @@ pub enum AnsError {
     InvalidAccountDerivation,
     #[error("name account does not match the requested name")]
     NameMismatch,
+    #[error("name is already registered")]
+    NameTaken,
     #[error("name is not active at the supplied slot")]
     InactiveName,
     #[error("record does not match the active name state")]
