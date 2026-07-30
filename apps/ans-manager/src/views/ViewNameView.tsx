@@ -658,18 +658,35 @@ export function ViewNameView() {
                       <ul className="domain-profile-activity-list">
                         {activity.map((row) => (
                           <li key={row.txid} className="domain-profile-activity-row">
-                            <ExplorerLink
-                              kind="tx"
-                              value={row.txid}
-                              truncate={{ head: 10, tail: 8 }}
-                              className="mono"
-                            />
-                            <span className="view-name-status">
-                              {formatActivityTime(row.createdAt)}
-                              {row.blockHeight != null
-                                ? ` · block ${row.blockHeight}`
-                                : ""}
-                            </span>
+                            <div className="domain-profile-activity-event">
+                              <span className="domain-profile-activity-title">
+                                {row.action?.title ?? "Transaction"}
+                                {row.failed ? (
+                                  <span className="domain-profile-activity-failed">
+                                    Failed
+                                  </span>
+                                ) : null}
+                              </span>
+                              {row.action?.detail ? (
+                                <span className="domain-profile-activity-detail">
+                                  {row.action.detail}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="domain-profile-activity-meta">
+                              <span className="view-name-status">
+                                {formatActivityTime(row.createdAt)}
+                                {row.blockHeight != null
+                                  ? ` · block ${row.blockHeight}`
+                                  : ""}
+                              </span>
+                              <ExplorerLink
+                                kind="tx"
+                                value={row.txid}
+                                truncate={{ head: 6, tail: 6 }}
+                                className="mono"
+                              />
+                            </div>
                           </li>
                         ))}
                       </ul>
