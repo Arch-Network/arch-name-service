@@ -74,6 +74,8 @@ export const ansClient = {
     getAnsClient().resolvePrimary(...args),
   listOwnedNames: (...args: Parameters<AnsClient["listOwnedNames"]>) =>
     getAnsClient().listOwnedNames(...args),
+  listNameAccounts: (...args: Parameters<AnsClient["listNameAccounts"]>) =>
+    getAnsClient().listNameAccounts(...args),
   listRecentNames: (...args: Parameters<AnsClient["listRecentNames"]>) =>
     getAnsClient().listRecentNames(...args),
   buildRegister: (...args: Parameters<AnsClient["buildRegister"]>) =>
