@@ -33,7 +33,10 @@ export type NameInstruction =
     }
   | { kind: "ListName"; nameHash: Uint8Array; currency: QuoteCurrency; price: bigint }
   | { kind: "CancelListing"; nameHash: Uint8Array }
-  | { kind: "BuyName"; nameHash: Uint8Array };
+  | { kind: "BuyName"; nameHash: Uint8Array }
+  | { kind: "MakeOffer"; nameHash: Uint8Array; currency: QuoteCurrency; price: bigint }
+  | { kind: "CancelOffer"; nameHash: Uint8Array }
+  | { kind: "AcceptOffer"; nameHash: Uint8Array; buyer: ArchAddress };
 
 const RECORD_TYPES: RecordType[] = ["ArchOwner", "BitcoinTaproot", "TokenAta", "Text"];
 const QUOTE_CURRENCIES: QuoteCurrency[] = ["Arch", "Btc"];
@@ -118,6 +121,17 @@ export function encodeInstruction(ix: NameInstruction): Uint8Array {
       return writer.u8(11).pubkey(ix.nameHash).finish();
     case "BuyName":
       return writer.u8(12).pubkey(ix.nameHash).finish();
+    case "MakeOffer":
+      return writer
+        .u8(13)
+        .pubkey(ix.nameHash)
+        .u8(QUOTE_CURRENCIES.indexOf(ix.currency))
+        .u64(ix.price)
+        .finish();
+    case "CancelOffer":
+      return writer.u8(14).pubkey(ix.nameHash).finish();
+    case "AcceptOffer":
+      return writer.u8(15).pubkey(ix.nameHash).pubkey(ix.buyer).finish();
   }
 }
 
@@ -209,6 +223,28 @@ export function decodeInstruction(data: Uint8Array): NameInstruction {
       break;
     case 12:
       ix = { kind: "BuyName", nameHash: reader.pubkey() };
+      break;
+    case 13: {
+      const nameHash = reader.pubkey();
+      const currency = QUOTE_CURRENCIES[reader.u8()];
+      if (!currency) throw new AnsError("CodecError", "invalid quote currency");
+      ix = {
+        kind: "MakeOffer",
+        nameHash,
+        currency,
+        price: reader.u64(),
+      };
+      break;
+    }
+    case 14:
+      ix = { kind: "CancelOffer", nameHash: reader.pubkey() };
+      break;
+    case 15:
+      ix = {
+        kind: "AcceptOffer",
+        nameHash: reader.pubkey(),
+        buyer: reader.pubkey(),
+      };
       break;
     default:
       throw new AnsError("CodecError", `unknown instruction variant ${kind}`);

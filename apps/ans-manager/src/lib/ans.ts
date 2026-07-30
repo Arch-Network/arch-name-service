@@ -82,6 +82,10 @@ export const ansClient = {
     getAnsClient().listActiveListings(...args),
   fetchListing: (...args: Parameters<AnsClient["fetchListing"]>) =>
     getAnsClient().fetchListing(...args),
+  fetchOffer: (...args: Parameters<AnsClient["fetchOffer"]>) =>
+    getAnsClient().fetchOffer(...args),
+  listOffersForName: (...args: Parameters<AnsClient["listOffersForName"]>) =>
+    getAnsClient().listOffersForName(...args),
   buildRegister: (...args: Parameters<AnsClient["buildRegister"]>) =>
     getAnsClient().buildRegister(...args),
   buildTransfer: (...args: Parameters<AnsClient["buildTransfer"]>) =>
@@ -92,6 +96,12 @@ export const ansClient = {
     getAnsClient().buildCancelListing(...args),
   buildBuyName: (...args: Parameters<AnsClient["buildBuyName"]>) =>
     getAnsClient().buildBuyName(...args),
+  buildMakeOffer: (...args: Parameters<AnsClient["buildMakeOffer"]>) =>
+    getAnsClient().buildMakeOffer(...args),
+  buildCancelOffer: (...args: Parameters<AnsClient["buildCancelOffer"]>) =>
+    getAnsClient().buildCancelOffer(...args),
+  buildAcceptOffer: (...args: Parameters<AnsClient["buildAcceptOffer"]>) =>
+    getAnsClient().buildAcceptOffer(...args),
   buildSetRecord: (...args: Parameters<AnsClient["buildSetRecord"]>) =>
     getAnsClient().buildSetRecord(...args),
   buildSetPrimary: (...args: Parameters<AnsClient["buildSetPrimary"]>) =>
@@ -295,6 +305,9 @@ export const MANAGE_ACTIONS = {
   list: "Listed name for sale",
   cancelListing: "Cancelled listing",
   buy: "Purchased name",
+  makeOffer: "Made offer",
+  cancelOffer: "Cancelled offer",
+  acceptOffer: "Accepted offer",
   register: "Register name",
 } as const;
 
@@ -307,6 +320,9 @@ const FAILURE_TITLES: Record<string, string> = {
   [MANAGE_ACTIONS.list]: "List for sale failed",
   [MANAGE_ACTIONS.cancelListing]: "Cancel listing failed",
   [MANAGE_ACTIONS.buy]: "Purchase failed",
+  [MANAGE_ACTIONS.makeOffer]: "Make offer failed",
+  [MANAGE_ACTIONS.cancelOffer]: "Cancel offer failed",
+  [MANAGE_ACTIONS.acceptOffer]: "Accept offer failed",
   [MANAGE_ACTIONS.register]: "Registration failed",
 };
 
@@ -319,6 +335,9 @@ const RETRY_LABELS: Record<string, string> = {
   [MANAGE_ACTIONS.list]: "List for sale",
   [MANAGE_ACTIONS.cancelListing]: "Cancel listing",
   [MANAGE_ACTIONS.buy]: "Buy name",
+  [MANAGE_ACTIONS.makeOffer]: "Make offer",
+  [MANAGE_ACTIONS.cancelOffer]: "Cancel offer",
+  [MANAGE_ACTIONS.acceptOffer]: "Accept offer",
   [MANAGE_ACTIONS.register]: "Register",
 };
 

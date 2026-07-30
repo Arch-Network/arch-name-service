@@ -2,15 +2,16 @@
 
 use ans_protocol::{
     derive::{
-        derive_config_address, derive_listing_address, derive_name_address,
+        derive_config_address, derive_listing_address, derive_name_address, derive_offer_address,
         derive_record_address_for_value, derive_reverse_address, namespace_hash, record_key_hash,
     },
     instruction::NameInstruction,
     name::validate_label,
     state::{
         decode_state, encode_state, AccountHeader, ArchAddress, BitcoinNetwork, ListingAccount,
-        QuoteCurrency, RecordAccount, RecordType, RecordValue, RegistryConfig,
-        LISTING_ACCOUNT_DISCRIMINATOR, NAME_ACCOUNT_DISCRIMINATOR, REGISTRY_CONFIG_DISCRIMINATOR,
+        OfferAccount, QuoteCurrency, RecordAccount, RecordType, RecordValue, RegistryConfig,
+        LISTING_ACCOUNT_DISCRIMINATOR, NAME_ACCOUNT_DISCRIMINATOR, OFFER_ACCOUNT_DISCRIMINATOR,
+        REGISTRY_CONFIG_DISCRIMINATOR,
     },
 };
 use arch_program::{
@@ -108,6 +109,17 @@ pub fn process_instruction<'a>(
             cancel_listing(program_id, accounts, name_hash)
         }
         NameInstruction::BuyName { name_hash } => buy_name(program_id, accounts, name_hash),
+        NameInstruction::MakeOffer {
+            name_hash,
+            currency,
+            price,
+        } => make_offer(program_id, accounts, name_hash, currency, price),
+        NameInstruction::CancelOffer { name_hash } => {
+            cancel_offer(program_id, accounts, name_hash)
+        }
+        NameInstruction::AcceptOffer { name_hash, buyer } => {
+            accept_offer(program_id, accounts, name_hash, buyer)
+        }
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
@@ -578,6 +590,158 @@ fn buy_name(
     store(buyer, listing_account, &listing)
 }
 
+fn make_offer(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    name_hash: [u8; 32],
+    currency: QuoteCurrency,
+    price: u64,
+) -> Result<(), ProgramError> {
+    if price == 0 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let iterator = &mut accounts.iter();
+    let buyer = next_account_info(iterator)?;
+    let config_account = next_account_info(iterator)?;
+    let name_account = next_account_info(iterator)?;
+    let offer_account = next_account_info(iterator)?;
+    require_signer(buyer)?;
+    let config = load_config(program_id, config_account)?;
+    ensure_unpaused(&config)?;
+    let name = load_name(program_id, name_account, &config, name_hash)?;
+    if name.owner == buyer.key.serialize() {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let offer_address = derive_offer_address(
+        program_id.serialize(),
+        &config.namespace,
+        name_hash,
+        buyer.key.serialize(),
+    );
+    require_address(offer_account, offer_address)?;
+    if offer_is_active(offer_account)? {
+        return Err(ProgramError::Custom(2));
+    }
+    let offer = marketplace::create_offer(name_hash, buyer.key.serialize(), currency, price);
+    let bytes = encode_state(&offer);
+    let namespace = namespace_hash(TESTNET_NAMESPACE);
+    let buyer_bytes = buyer.key.serialize();
+    let seeds: [&[u8]; 4] = [
+        b"ans:offer:v1",
+        namespace.as_slice(),
+        name_hash.as_slice(),
+        buyer_bytes.as_slice(),
+    ];
+    if offer_account.owner == program_id {
+        // Reuse deactivated offer PDA.
+    } else if offer_account.data_is_empty() {
+        create_pda(
+            program_id,
+            buyer,
+            offer_account,
+            accounts,
+            &seeds,
+            bytes.len(),
+        )?;
+    } else {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    store(buyer, offer_account, &offer)?;
+    if currency == QuoteCurrency::Arch {
+        transfer_lamports(buyer, offer_account, price)?;
+    }
+    Ok(())
+}
+
+fn cancel_offer(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    name_hash: [u8; 32],
+) -> Result<(), ProgramError> {
+    let iterator = &mut accounts.iter();
+    let buyer = next_account_info(iterator)?;
+    let config_account = next_account_info(iterator)?;
+    let offer_account = next_account_info(iterator)?;
+    require_signer(buyer)?;
+    let config = load_config(program_id, config_account)?;
+    ensure_unpaused(&config)?;
+    let mut offer = load_active_offer(
+        program_id,
+        offer_account,
+        &config,
+        name_hash,
+        buyer.key.serialize(),
+    )?;
+    if offer.currency == QuoteCurrency::Arch {
+        transfer_lamports(offer_account, buyer, offer.price)?;
+    }
+    marketplace::deactivate_offer(&mut offer);
+    store(buyer, offer_account, &offer)
+}
+
+fn accept_offer(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    name_hash: [u8; 32],
+    buyer_key: ArchAddress,
+) -> Result<(), ProgramError> {
+    let iterator = &mut accounts.iter();
+    let seller = next_account_info(iterator)?;
+    let buyer = next_account_info(iterator)?;
+    let config_account = next_account_info(iterator)?;
+    let name_account = next_account_info(iterator)?;
+    let offer_account = next_account_info(iterator)?;
+    let listing_account = next_account_info(iterator)?;
+    require_signer(seller)?;
+    let config = load_config(program_id, config_account)?;
+    ensure_unpaused(&config)?;
+    let mut name = load_name(program_id, name_account, &config, name_hash)?;
+    require_owner(seller, &name.owner)?;
+    if buyer.key.serialize() != buyer_key {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    let mut offer = load_active_offer(program_id, offer_account, &config, name_hash, buyer_key)?;
+    match offer.currency {
+        QuoteCurrency::Arch => {
+            transfer_lamports(offer_account, seller, offer.price)?;
+        }
+        QuoteCurrency::Btc => {
+            require_signer(buyer)?;
+            let buyer_ata = next_account_info(iterator)?;
+            let seller_ata = next_account_info(iterator)?;
+            let mint = next_account_info(iterator)?;
+            let token_program = next_account_info(iterator)?;
+            if mint.key.serialize() != TESTNET_ABTC_MINT {
+                return Err(ProgramError::InvalidAccountData);
+            }
+            if token_program.key.serialize() != TOKEN_PROGRAM_ID_BYTES {
+                return Err(ProgramError::IncorrectProgramId);
+            }
+            transfer_abtc(
+                buyer,
+                buyer_ata,
+                seller_ata,
+                mint,
+                token_program,
+                offer.price,
+            )?;
+        }
+    }
+    transition::transfer(&mut name, buyer_key);
+    marketplace::deactivate_offer(&mut offer);
+    require_address(
+        listing_account,
+        derive_listing_address(program_id.serialize(), &config.namespace, name_hash),
+    )?;
+    if listing_is_active(listing_account)? {
+        let mut listing = load::<ListingAccount>(listing_account)?;
+        marketplace::deactivate_listing(&mut listing);
+        store(seller, listing_account, &listing)?;
+    }
+    store(seller, name_account, &name)?;
+    store(seller, offer_account, &offer)
+}
+
 fn transfer_lamports(
     from: &AccountInfo,
     to: &AccountInfo,
@@ -631,6 +795,43 @@ fn listing_is_active(account: &AccountInfo) -> Result<bool, ProgramError> {
         .validate(LISTING_ACCOUNT_DISCRIMINATOR)
         .map_err(|_| ProgramError::InvalidAccountData)?;
     Ok(listing.active)
+}
+
+fn offer_is_active(account: &AccountInfo) -> Result<bool, ProgramError> {
+    if account.owner == &Pubkey::system_program() || account.data_is_empty() {
+        return Ok(false);
+    }
+    let offer = load::<OfferAccount>(account)?;
+    offer
+        .header
+        .validate(OFFER_ACCOUNT_DISCRIMINATOR)
+        .map_err(|_| ProgramError::InvalidAccountData)?;
+    Ok(offer.active)
+}
+
+fn load_active_offer(
+    program_id: &Pubkey,
+    account: &AccountInfo,
+    config: &RegistryConfig,
+    name_hash: [u8; 32],
+    buyer: ArchAddress,
+) -> Result<OfferAccount, ProgramError> {
+    if account.owner != program_id {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    let offer = load::<OfferAccount>(account)?;
+    offer
+        .header
+        .validate(OFFER_ACCOUNT_DISCRIMINATOR)
+        .map_err(|_| ProgramError::InvalidAccountData)?;
+    if offer.name_hash != name_hash || offer.buyer != buyer || !offer.active {
+        return Err(ProgramError::Custom(3));
+    }
+    require_address(
+        account,
+        derive_offer_address(program_id.serialize(), &config.namespace, name_hash, buyer),
+    )?;
+    Ok(offer)
 }
 
 fn load_active_listing(

@@ -420,6 +420,175 @@ a.btn {
   font-size: 14px;
 }
 
+.domain-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .domain-profile-layout { grid-template-columns: 1fr; }
+}
+.domain-profile-main,
+.domain-profile-aside,
+.domain-profile-details,
+.domain-profile-offers,
+.domain-profile-activity {
+  display: grid;
+  gap: var(--space-4);
+}
+.domain-profile-hero {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(120% 80% at 10% 0%, color-mix(in srgb, var(--color-primary) 18%, transparent), transparent 55%),
+    linear-gradient(160deg, #1a1a1e 0%, #2a2420 100%);
+  color: #f7f4f0;
+}
+.domain-profile-hero .eyebrow { color: color-mix(in srgb, #f7f4f0 70%, transparent); }
+.domain-profile-title {
+  margin: 0;
+  font: 700 clamp(1.6rem, 3vw, 2.4rem) / 1.1 var(--font-display);
+  letter-spacing: -0.02em;
+  color: inherit;
+}
+.domain-profile-art {
+  margin: 0;
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--color-primary) 85%, #fff);
+  color: #fff;
+  font: 800 28px/1 var(--font-display);
+}
+.domain-profile-meta {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+.domain-profile-meta > div { display: grid; gap: var(--space-1); }
+.domain-profile-meta dt {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.domain-profile-meta dd { margin: 0; }
+.domain-profile-contact-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+.domain-profile-contact-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.domain-profile-tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border-divider);
+}
+.domain-profile-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-secondary);
+  font: 600 14px var(--font-sans);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.domain-profile-tab-active {
+  color: var(--text-primary);
+  border-bottom-color: var(--color-primary);
+}
+.domain-profile-tab-count {
+  min-width: 1.4em;
+  padding: 0 6px;
+  border-radius: var(--radius-chip);
+  background: var(--surface-subtle);
+  font: 600 11px var(--font-mono);
+}
+.domain-profile-panel {
+  padding: var(--space-5);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+.domain-profile-chip {
+  display: inline-block;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-chip);
+  background: var(--color-primary-tint);
+  color: var(--color-primary-hover);
+  font: 600 13px var(--font-sans);
+}
+.domain-profile-offer-form,
+.domain-profile-offer-list,
+.domain-profile-activity-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.domain-profile-offer-row,
+.domain-profile-activity-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-divider);
+}
+.domain-profile-offer-row:last-child,
+.domain-profile-activity-row:last-child { border-bottom: 0; }
+.domain-profile-offer-price { margin: 0 0 var(--space-1); font-weight: 700; }
+.domain-profile-offer-actions { display: flex; gap: var(--space-2); }
+.domain-profile-price-card {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-card);
+  position: sticky;
+  top: var(--space-4);
+}
+.domain-profile-list-price {
+  margin: 0;
+  font: 700 1.5rem/1.2 var(--font-mono);
+}
+.domain-profile-list-price.muted {
+  color: var(--text-muted);
+  font-size: 1.1rem;
+}
+.domain-profile-price-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+.domain-profile-price-stats p { margin: var(--space-1) 0 0; }
+.domain-profile-aside-actions { display: grid; gap: var(--space-2); }
+
 .manage-list-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

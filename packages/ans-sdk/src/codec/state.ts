@@ -1,6 +1,7 @@
 import {
   LISTING_ACCOUNT_DISCRIMINATOR,
   NAME_ACCOUNT_DISCRIMINATOR,
+  OFFER_ACCOUNT_DISCRIMINATOR,
   RECORD_ACCOUNT_DISCRIMINATOR,
   REGISTRY_CONFIG_DISCRIMINATOR,
   REVERSE_ACCOUNT_DISCRIMINATOR,
@@ -13,6 +14,7 @@ import type {
   BitcoinNetwork,
   ListingAccount,
   NameAccount,
+  OfferAccount,
   QuoteCurrency,
   RecordAccount,
   RecordType,
@@ -267,6 +269,39 @@ export function decodeListingAccount(data: Uint8Array): ListingAccount {
   return listing;
 }
 
+export function encodeOfferAccount(offer: OfferAccount): Uint8Array {
+  const writer = new BorshWriter();
+  encodeHeader(offer.header, writer);
+  writer
+    .pubkey(offer.nameHash)
+    .pubkey(offer.buyer)
+    .u8(QUOTE_CURRENCIES.indexOf(offer.currency))
+    .u64(offer.price)
+    .u64(offer.createdAtSlot)
+    .bool(offer.active);
+  return writer.finish();
+}
+
+export function decodeOfferAccount(data: Uint8Array): OfferAccount {
+  const reader = new BorshReader(data);
+  const header = decodeHeader(reader);
+  const nameHash = reader.pubkey();
+  const buyer = reader.pubkey();
+  const currency = QUOTE_CURRENCIES[reader.u8()];
+  if (!currency) throw new AnsError("CodecError", "invalid quote currency");
+  const offer: OfferAccount = {
+    header,
+    nameHash,
+    buyer,
+    currency,
+    price: reader.u64(),
+    createdAtSlot: reader.u64(),
+    active: reader.bool(),
+  };
+  reader.finish();
+  return offer;
+}
+
 export function initializedHeader(discriminator: Uint8Array): AccountHeader {
   return {
     discriminator: Uint8Array.from(discriminator),
@@ -278,6 +313,7 @@ export function initializedHeader(discriminator: Uint8Array): AccountHeader {
 export {
   LISTING_ACCOUNT_DISCRIMINATOR,
   NAME_ACCOUNT_DISCRIMINATOR,
+  OFFER_ACCOUNT_DISCRIMINATOR,
   RECORD_ACCOUNT_DISCRIMINATOR,
   REGISTRY_CONFIG_DISCRIMINATOR,
   REVERSE_ACCOUNT_DISCRIMINATOR,

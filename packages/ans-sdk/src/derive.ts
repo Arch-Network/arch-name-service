@@ -4,6 +4,7 @@ import {
   CONFIG_SEED,
   LISTING_SEED,
   NAME_SEED,
+  OFFER_SEED,
   RECORD_SEED,
   REVERSE_SEED,
 } from "./constants.js";
@@ -122,6 +123,20 @@ export function deriveListingAddress(
   nameHashBytes: Uint8Array,
 ): ArchAddress {
   return derive(programId, [LISTING_SEED, namespaceHash(namespace), nameHashBytes]);
+}
+
+export function deriveOfferAddress(
+  programId: ArchAddress,
+  namespace: string,
+  nameHashBytes: Uint8Array,
+  buyer: ArchAddress,
+): ArchAddress {
+  return derive(programId, [
+    OFFER_SEED,
+    namespaceHash(namespace),
+    nameHashBytes,
+    buyer,
+  ]);
 }
 
 export function deriveTokenAta(

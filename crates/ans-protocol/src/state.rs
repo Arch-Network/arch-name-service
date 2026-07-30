@@ -8,6 +8,7 @@ pub const NAME_ACCOUNT_DISCRIMINATOR: [u8; 8] = *b"ANSNAME1";
 pub const RECORD_ACCOUNT_DISCRIMINATOR: [u8; 8] = *b"ANSRECR1";
 pub const REVERSE_ACCOUNT_DISCRIMINATOR: [u8; 8] = *b"ANSREVR1";
 pub const LISTING_ACCOUNT_DISCRIMINATOR: [u8; 8] = *b"ANSLIST1";
+pub const OFFER_ACCOUNT_DISCRIMINATOR: [u8; 8] = *b"ANSOFFR1";
 
 pub type ArchAddress = [u8; 32];
 
@@ -163,6 +164,19 @@ pub struct ListingAccount {
     pub header: AccountHeader,
     pub name_hash: [u8; 32],
     pub seller: ArchAddress,
+    pub currency: QuoteCurrency,
+    pub price: u64,
+    pub created_at_slot: u64,
+    pub active: bool,
+}
+
+/// Buyer offer against a registered name. ARCH offers escrow lamports in the
+/// offer PDA; BTC (aBTC) offers require the buyer to co-sign `AcceptOffer`.
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct OfferAccount {
+    pub header: AccountHeader,
+    pub name_hash: [u8; 32],
+    pub buyer: ArchAddress,
     pub currency: QuoteCurrency,
     pub price: u64,
     pub created_at_slot: u64,

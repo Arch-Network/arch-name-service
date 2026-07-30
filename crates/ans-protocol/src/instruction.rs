@@ -66,4 +66,19 @@ pub enum NameInstruction {
     BuyName {
         name_hash: [u8; 32],
     },
+    /// Buyer places a fixed-price offer (ARCH lamports escrowed in the offer PDA).
+    MakeOffer {
+        name_hash: [u8; 32],
+        currency: QuoteCurrency,
+        price: u64,
+    },
+    /// Buyer cancels their active offer (refunds ARCH escrow when applicable).
+    CancelOffer {
+        name_hash: [u8; 32],
+    },
+    /// Seller accepts a buyer's active offer and transfers the name.
+    AcceptOffer {
+        name_hash: [u8; 32],
+        buyer: ArchAddress,
+    },
 }
