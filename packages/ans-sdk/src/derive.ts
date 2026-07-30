@@ -2,6 +2,7 @@ import { PubkeyUtil } from "@saturnbtcio/arch-sdk";
 
 import {
   CONFIG_SEED,
+  LISTING_SEED,
   NAME_SEED,
   RECORD_SEED,
   REVERSE_SEED,
@@ -113,6 +114,14 @@ export function deriveReverseAddress(
   owner: ArchAddress,
 ): ArchAddress {
   return derive(programId, [REVERSE_SEED, namespaceHash(namespace), owner]);
+}
+
+export function deriveListingAddress(
+  programId: ArchAddress,
+  namespace: string,
+  nameHashBytes: Uint8Array,
+): ArchAddress {
+  return derive(programId, [LISTING_SEED, namespaceHash(namespace), nameHashBytes]);
 }
 
 export function deriveTokenAta(

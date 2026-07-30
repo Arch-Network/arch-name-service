@@ -1,17 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { TEXT_RECORD_CATALOG, canonicalizeName } from "@arch-network/ans-sdk";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  TEXT_RECORD_CATALOG,
+  TESTNET_ABTC_MINT,
+  TOKEN_PROGRAM_ID,
+  canonicalizeName,
+  deriveTokenAta,
+  type ListingAccount,
+} from "@arch-network/ans-sdk";
 import { CopyValue } from "../components/CopyValue";
 import { ExplorerLink } from "../components/ExplorerLink";
 import { ReadOnlyRecordGroups } from "../components/ReadOnlyRecordGroups";
 import { StatusNotice } from "../components/StatusNotice";
 import { useArchWallet } from "../hooks/useArchWallet";
-import { archAddressesEqual } from "../lib/ans";
+import {
+  MANAGE_ACTIONS,
+  ansClient,
+  archAddressesEqual,
+  decodeArchAddress,
+  submitWithWindowArch,
+} from "../lib/ans";
 import { loadNameProfile, type LoadedProfile } from "../lib/name-profile";
 import {
   managePathForName,
   registerPathForLabel,
 } from "../lib/register-handoff";
+import { nameOwnedBy } from "../lib/confirm-effects";
+import { walletStatusCta } from "../lib/wallet-status";
 
 type ExtraRecord = { id: string; label: string; value: string };
 
@@ -32,12 +48,16 @@ function extrasFromProfile(profile: LoadedProfile): ExtraRecord[] {
 }
 
 export function ViewNameView() {
-  const { account } = useArchWallet();
+  const { status, account, refresh, openWalletPicker } = useArchWallet();
   const [searchParams] = useSearchParams();
   const nameParam = searchParams.get("name");
   const [profile, setProfile] = useState<LoadedProfile | null>(null);
+  const [listing, setListing] = useState<ListingAccount | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [buyBusy, setBuyBusy] = useState(false);
+  const [buyError, setBuyError] = useState<string | null>(null);
+  const [buyTxid, setBuyTxid] = useState<string | null>(null);
 
   const canonicalName = useMemo(() => {
     if (!nameParam?.trim()) return null;
@@ -52,6 +72,7 @@ export function ViewNameView() {
   useEffect(() => {
     if (!canonicalName) {
       setProfile(null);
+      setListing(null);
       setError(null);
       return;
     }
@@ -59,8 +80,12 @@ export function ViewNameView() {
     setLoading(true);
     setError(null);
     setProfile(null);
-    void loadNameProfile(canonicalName, account?.archAddress ?? null)
-      .then(({ profile: next, error: loadError }) => {
+    setListing(null);
+    void Promise.all([
+      loadNameProfile(canonicalName, account?.archAddress ?? null),
+      ansClient.fetchListing(canonicalName),
+    ])
+      .then(([{ profile: next, error: loadError }, nextListing]) => {
         if (cancelled) return;
         if (loadError || !next) {
           setProfile(null);
@@ -68,6 +93,7 @@ export function ViewNameView() {
           return;
         }
         setProfile(next);
+        setListing(nextListing);
       })
       .catch((err) => {
         if (!cancelled) {
@@ -80,7 +106,7 @@ export function ViewNameView() {
     return () => {
       cancelled = true;
     };
-  }, [canonicalName, account?.archAddress]);
+  }, [canonicalName, account?.archAddress, buyTxid]);
 
   const extras = useMemo(
     () => (profile ? extrasFromProfile(profile) : []),
@@ -91,6 +117,64 @@ export function ViewNameView() {
     !!account?.archAddress &&
     archAddressesEqual(profile.ownerDisplay, account.archAddress);
   const available = !!canonicalName && !loading && !profile && !!error?.includes("not registered");
+  const cta = walletStatusCta(status);
+  const canBuy =
+    !!listing &&
+    !!profile?.ownerDisplay &&
+    !!account?.archAddress &&
+    !ownedByViewer &&
+    !cta;
+
+  async function onBuy() {
+    if (!canonicalName || !listing || !profile?.ownerDisplay) return;
+    setBuyBusy(true);
+    setBuyError(null);
+    setBuyTxid(null);
+    try {
+      const current = await refresh();
+      if (current.state !== "connected") {
+        openWalletPicker();
+        return;
+      }
+      const buyer = decodeArchAddress(current.account.archAddress);
+      const seller = decodeArchAddress(profile.ownerDisplay);
+      const tokenAccounts =
+        listing.currency === "Btc"
+          ? {
+              buyerAta: deriveTokenAta(
+                buyer,
+                TESTNET_ABTC_MINT,
+                TOKEN_PROGRAM_ID,
+                ASSOCIATED_TOKEN_PROGRAM_ID,
+              ),
+              sellerAta: deriveTokenAta(
+                seller,
+                TESTNET_ABTC_MINT,
+                TOKEN_PROGRAM_ID,
+                ASSOCIATED_TOKEN_PROGRAM_ID,
+              ),
+            }
+          : undefined;
+      const outcome = await submitWithWindowArch(
+        async (actor) =>
+          ansClient.buildBuyName(
+            decodeArchAddress(actor),
+            seller,
+            canonicalName,
+            listing.currency,
+            tokenAccounts,
+          ),
+        undefined,
+        nameOwnedBy(canonicalName, current.account.archAddress),
+      );
+      setBuyTxid(outcome.txid);
+      setListing(null);
+    } catch (err) {
+      setBuyError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBuyBusy(false);
+    }
+  }
 
   return (
     <section className="page-section page-section-wide view-name-page">
@@ -152,8 +236,41 @@ export function ViewNameView() {
               <Link className="btn btn-primary" to={managePathForName(canonicalName)}>
                 Manage
               </Link>
+            ) : listing ? (
+              <div className="view-name-buy">
+                <p className="view-name-price mono">
+                  {listing.price.toString()}{" "}
+                  {listing.currency === "Btc" ? "aBTC sats" : "ARCH lamports"}
+                </p>
+                {cta ? (
+                  <button className="btn btn-primary" type="button" onClick={openWalletPicker}>
+                    Connect to buy
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-primary"
+                    type="button"
+                    disabled={!canBuy || buyBusy}
+                    onClick={() => void onBuy()}
+                  >
+                    {buyBusy ? "Buying…" : `Buy ${canonicalName}`}
+                  </button>
+                )}
+              </div>
             ) : null}
           </div>
+
+          {buyTxid ? (
+            <StatusNotice
+              tone="success"
+              title="Purchase submitted"
+              message="Ownership should update once the transaction confirms."
+              detail={buyTxid}
+            />
+          ) : null}
+          {buyError ? (
+            <StatusNotice tone="error" title={MANAGE_ACTIONS.buy} message={buyError} />
+          ) : null}
 
           <div className="view-name-owner">
             <span className="resolution-label">Owner</span>

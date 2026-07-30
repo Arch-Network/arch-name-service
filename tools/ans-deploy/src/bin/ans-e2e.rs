@@ -4,7 +4,9 @@ use std::{
 };
 
 use ans_protocol::{
-    derive::{derive_name_address, derive_record_address, derive_reverse_address},
+    derive::{
+        derive_listing_address, derive_name_address, derive_record_address, derive_reverse_address,
+    },
     name::name_hash,
     state::{decode_state, NameAccount, RecordType, RecordValue, NAME_ACCOUNT_DISCRIMINATOR},
     NameInstruction,
@@ -290,6 +292,14 @@ fn execute_arch_purchase(
             AccountMeta::new(seller, true),
             AccountMeta::new_readonly(registry_config, false),
             AccountMeta::new(name_account, false),
+            AccountMeta::new_readonly(
+                Pubkey::new_from_array(derive_listing_address(
+                    program_id.serialize(),
+                    NAMESPACE,
+                    hash,
+                )),
+                false,
+            ),
         ],
         data: to_vec(&NameInstruction::Transfer {
             name_hash: hash,

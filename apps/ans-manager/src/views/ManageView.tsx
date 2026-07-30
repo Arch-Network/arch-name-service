@@ -67,6 +67,12 @@ export function ManageView() {
   const nameParam = searchParams.get("name");
   const [name, setName] = useState(nameParam ?? "");
   const [transferTo, setTransferTo] = useState("");
+  const [listPrice, setListPrice] = useState("");
+  const [listCurrency, setListCurrency] = useState<"Arch" | "Btc">("Arch");
+  const [activeListing, setActiveListing] = useState<{
+    currency: "Arch" | "Btc";
+    price: bigint;
+  } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [profile, setProfile] = useState<LoadedProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -137,6 +143,7 @@ export function ManageView() {
     setDrafts({});
     setProfile(null);
     setProfileError(null);
+    setActiveListing(null);
   }, [canonicalName]);
 
   useEffect(() => {
@@ -168,6 +175,14 @@ export function ManageView() {
             ]),
           ),
         }));
+        const listing = await ansClient.fetchListing(canonicalName);
+        if (!cancelled) {
+          setActiveListing(
+            listing
+              ? { currency: listing.currency, price: listing.price }
+              : null,
+          );
+        }
       } catch (err) {
         if (!cancelled) {
           setProfileError(err instanceof Error ? err.message : String(err));
@@ -504,6 +519,103 @@ export function ManageView() {
             />
           </div>
         ) : null}
+
+        <div className="card manage-section">
+          <h2 className="section-heading">List for sale</h2>
+          <p className="section-copy">
+            Fixed-price listing in ARCH lamports or aBTC (Arch Bitcoin). An active listing blocks
+            transfers until you cancel or someone buys.
+          </p>
+          {activeListing ? (
+            <>
+              <StatusNotice
+                tone="info"
+                title="Listed"
+                message={`${activeListing.price.toString()} ${activeListing.currency === "Btc" ? "aBTC sats" : "ARCH lamports"}`}
+              />
+              <button
+                className="btn btn-secondary"
+                disabled={busy || !ready || !canonicalName}
+                onClick={() =>
+                  void run(
+                    MANAGE_ACTIONS.cancelListing,
+                    (archAddress) =>
+                      ansClient.buildCancelListing(
+                        decodeArchAddress(archAddress),
+                        canonicalName!,
+                      ),
+                    async () => (await ansClient.fetchListing(canonicalName!)) == null,
+                  )
+                }
+              >
+                {busyAction === MANAGE_ACTIONS.cancelListing
+                  ? "Waiting for approval…"
+                  : "Cancel listing"}
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="manage-list-row">
+                <div>
+                  <label className="input-label" htmlFor="list-price">
+                    Price
+                  </label>
+                  <input
+                    id="list-price"
+                    className="input mono"
+                    inputMode="numeric"
+                    placeholder="1000"
+                    value={listPrice}
+                    onChange={(e) => setListPrice(e.target.value.replace(/[^\d]/g, ""))}
+                  />
+                </div>
+                <div>
+                  <label className="input-label" htmlFor="list-currency">
+                    Currency
+                  </label>
+                  <select
+                    id="list-currency"
+                    className="input"
+                    value={listCurrency}
+                    onChange={(e) => setListCurrency(e.target.value as "Arch" | "Btc")}
+                  >
+                    <option value="Arch">ARCH (lamports)</option>
+                    <option value="Btc">BTC (aBTC sats)</option>
+                  </select>
+                </div>
+              </div>
+              <button
+                className="btn btn-primary"
+                disabled={
+                  busy || !ready || !canonicalName || !listPrice || BigInt(listPrice || "0") === 0n
+                }
+                onClick={() => {
+                  const price = BigInt(listPrice);
+                  void run(
+                    MANAGE_ACTIONS.list,
+                    (archAddress) =>
+                      ansClient.buildListName(
+                        decodeArchAddress(archAddress),
+                        canonicalName!,
+                        listCurrency,
+                        price,
+                      ),
+                    async () => {
+                      const listing = await ansClient.fetchListing(canonicalName!);
+                      return (
+                        !!listing &&
+                        listing.currency === listCurrency &&
+                        listing.price === price
+                      );
+                    },
+                  );
+                }}
+              >
+                {busyAction === MANAGE_ACTIONS.list ? "Waiting for approval…" : "List for sale"}
+              </button>
+            </>
+          )}
+        </div>
 
         <details className="card manage-section danger-zone">
           <summary className="danger-zone-summary">

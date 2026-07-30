@@ -20,15 +20,18 @@ export {
   type NameInstruction,
 } from "./codec/instruction.js";
 export {
+  decodeListingAccount,
   decodeNameAccount,
   decodeRecordAccount,
   decodeRegistryConfig,
   decodeReverseAccount,
+  encodeListingAccount,
   encodeNameAccount,
   encodeRecordAccount,
   encodeRegistryConfig,
   encodeReverseAccount,
   initializedHeader,
+  LISTING_ACCOUNT_DISCRIMINATOR,
   NAME_ACCOUNT_DISCRIMINATOR,
   RECORD_ACCOUNT_DISCRIMINATOR,
   REGISTRY_CONFIG_DISCRIMINATOR,
@@ -38,6 +41,7 @@ export {
 export * from "./constants.js";
 export {
   deriveConfigAddress,
+  deriveListingAddress,
   deriveNameAddress,
   deriveRecordAddress,
   deriveRecordAddressFor,
@@ -48,8 +52,11 @@ export {
 export { AnsError, type AnsErrorCode } from "./errors.js";
 export { bytesEqual, bytesToHex, hexToBytes } from "./hex.js";
 export {
+  buildBuyNameInstruction,
+  buildCancelListingInstruction,
   buildClearPrimaryInstruction,
   buildDeleteRecordInstruction,
+  buildListNameInstruction,
   buildRegisterInstruction,
   buildSetPrimaryInstruction,
   buildSetRecordInstruction,
@@ -109,7 +116,9 @@ export type {
   ArchAddress,
   BitcoinNetwork,
   BuiltInstruction,
+  ListingAccount,
   NameAccount,
+  QuoteCurrency,
   RecordAccount,
   RecordType,
   RecordValue,

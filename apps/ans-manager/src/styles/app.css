@@ -420,8 +420,15 @@ a.btn {
   font-size: 14px;
 }
 
-.manage-flow { display: grid; gap: var(--space-4); }
-.manage-flow > .card { min-width: 0; margin-bottom: 0; }
+.manage-list-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+@media (max-width: 640px) {
+  .manage-list-row { grid-template-columns: 1fr; }
+}
 .step-heading {
   display: flex;
   align-items: flex-start;
@@ -1667,12 +1674,10 @@ a.btn {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
-.explore-name-meta {
-  color: var(--text-muted);
-  font-size: 11px;
+.explore-name-price {
+  color: var(--color-primary);
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 .explore-name-owner {
   color: var(--text-secondary);

@@ -1,4 +1,5 @@
 import {
+  LISTING_ACCOUNT_DISCRIMINATOR,
   NAME_ACCOUNT_DISCRIMINATOR,
   RECORD_ACCOUNT_DISCRIMINATOR,
   REGISTRY_CONFIG_DISCRIMINATOR,
@@ -10,7 +11,9 @@ import { bytesEqual } from "../hex.js";
 import type {
   AccountHeader,
   BitcoinNetwork,
+  ListingAccount,
   NameAccount,
+  QuoteCurrency,
   RecordAccount,
   RecordType,
   RecordValue,
@@ -23,6 +26,7 @@ import { BorshWriter } from "./writer.js";
 
 const BITCOIN_NETWORKS: BitcoinNetwork[] = ["mainnet", "testnet", "signet", "regtest"];
 const RECORD_TYPES: RecordType[] = ["ArchOwner", "BitcoinTaproot", "TokenAta", "Text"];
+const QUOTE_CURRENCIES: QuoteCurrency[] = ["Arch", "Btc"];
 
 export function encodeHeader(header: AccountHeader, writer = new BorshWriter()): BorshWriter {
   return writer.bytes(header.discriminator).bool(header.initialized).u16(header.stateVersion);
@@ -230,6 +234,39 @@ export function decodeReverseAccount(data: Uint8Array): ReverseAccount {
   return reverse;
 }
 
+export function encodeListingAccount(listing: ListingAccount): Uint8Array {
+  const writer = new BorshWriter();
+  encodeHeader(listing.header, writer);
+  writer
+    .pubkey(listing.nameHash)
+    .pubkey(listing.seller)
+    .u8(QUOTE_CURRENCIES.indexOf(listing.currency))
+    .u64(listing.price)
+    .u64(listing.createdAtSlot)
+    .bool(listing.active);
+  return writer.finish();
+}
+
+export function decodeListingAccount(data: Uint8Array): ListingAccount {
+  const reader = new BorshReader(data);
+  const header = decodeHeader(reader);
+  const nameHash = reader.pubkey();
+  const seller = reader.pubkey();
+  const currency = QUOTE_CURRENCIES[reader.u8()];
+  if (!currency) throw new AnsError("CodecError", "invalid quote currency");
+  const listing: ListingAccount = {
+    header,
+    nameHash,
+    seller,
+    currency,
+    price: reader.u64(),
+    createdAtSlot: reader.u64(),
+    active: reader.bool(),
+  };
+  reader.finish();
+  return listing;
+}
+
 export function initializedHeader(discriminator: Uint8Array): AccountHeader {
   return {
     discriminator: Uint8Array.from(discriminator),
@@ -239,6 +276,7 @@ export function initializedHeader(discriminator: Uint8Array): AccountHeader {
 }
 
 export {
+  LISTING_ACCOUNT_DISCRIMINATOR,
   NAME_ACCOUNT_DISCRIMINATOR,
   RECORD_ACCOUNT_DISCRIMINATOR,
   REGISTRY_CONFIG_DISCRIMINATOR,

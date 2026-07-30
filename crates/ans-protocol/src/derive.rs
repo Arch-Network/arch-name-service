@@ -7,6 +7,7 @@ const CONFIG_SEED: &[u8] = b"ans:config:v1";
 const NAME_SEED: &[u8] = b"ans:name:v1";
 const RECORD_SEED: &[u8] = b"ans:record:v1";
 const REVERSE_SEED: &[u8] = b"ans:reverse:v1";
+const LISTING_SEED: &[u8] = b"ans:listing:v1";
 const NAMESPACE_DOMAIN: &[u8] = b"arch-name-service:namespace:v1\0";
 const RECORD_KEY_DOMAIN: &[u8] = b"arch-name-service:record-key:v1\0";
 
@@ -123,6 +124,17 @@ pub fn derive_reverse_address(
     derive(
         program_id,
         &[REVERSE_SEED, &namespace_hash(namespace), &owner],
+    )
+}
+
+pub fn derive_listing_address(
+    program_id: ArchAddress,
+    namespace: &str,
+    name_hash: [u8; 32],
+) -> ArchAddress {
+    derive(
+        program_id,
+        &[LISTING_SEED, &namespace_hash(namespace), &name_hash],
     )
 }
 

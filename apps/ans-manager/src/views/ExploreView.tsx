@@ -9,6 +9,7 @@ import {
   collectionStats,
   explorePathForCollection,
   filterMarketplaceEntries,
+  listedCount,
   parseCollectionId,
   sortMarketplaceEntries,
   type CollectionId,
@@ -22,6 +23,11 @@ function formatCapacity(registered: number, capacity: number | null): string {
   return `${registered.toLocaleString()} / ${capacity.toLocaleString()}`;
 }
 
+function formatListingPrice(listing: NonNullable<MarketplaceEntry["listing"]>): string {
+  const unit = listing.currency === "Btc" ? "aBTC" : "ARCH";
+  return `${listing.price.toString()} ${unit}`;
+}
+
 export function ExploreView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const collectionId = parseCollectionId(searchParams.get("collection"));
@@ -30,20 +36,27 @@ export function ExploreView() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<MarketplaceSort>("name-asc");
+  const [listedOnly, setListedOnly] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void ansClient
-      .listNameAccounts()
-      .then((rows) => {
+    void Promise.all([ansClient.listNameAccounts(), ansClient.listActiveListings()])
+      .then(([rows, listings]) => {
         if (cancelled) return;
+        const byName = new Map(
+          listings.map((row) => [
+            row.name,
+            { currency: row.listing.currency, price: row.listing.price },
+          ]),
+        );
         setEntries(
           rows.map((row) => ({
             name: row.name,
             ownerDisplay: bs58.encode(row.account.owner),
             registeredAtSlot: row.account.registeredAtSlot,
+            listing: byName.get(row.name) ?? null,
           })),
         );
       })
@@ -69,26 +82,31 @@ export function ExploreView() {
       registered: entries.length,
       owners,
       collections: MARKETPLACE_COLLECTIONS.filter((c) => c.id !== "all").length,
+      listed: listedCount(entries),
     };
   }, [entries]);
 
   const collectionCards = useMemo(
     () =>
-      MARKETPLACE_COLLECTIONS.map((collection) => ({
-        collection,
-        stats: collectionStats(entries, collection),
-      })),
+      MARKETPLACE_COLLECTIONS.map((collection) => {
+        const stats = collectionStats(entries, collection);
+        const listed = listedCount(
+          entries.filter((e) => entryMatches(e, collection.id)),
+        );
+        return { collection, stats, listed };
+      }),
     [entries],
   );
 
-  const visible = useMemo(
-    () =>
-      sortMarketplaceEntries(
-        filterMarketplaceEntries(entries, { collectionId, query }),
-        sort,
-      ),
-    [collectionId, entries, query, sort],
-  );
+  function entryMatches(entry: MarketplaceEntry, id: CollectionId): boolean {
+    return filterMarketplaceEntries([entry], { collectionId: id }).length > 0;
+  }
+
+  const visible = useMemo(() => {
+    let rows = filterMarketplaceEntries(entries, { collectionId, query });
+    if (listedOnly) rows = rows.filter((e) => !!e.listing);
+    return sortMarketplaceEntries(rows, sort);
+  }, [collectionId, entries, listedOnly, query, sort]);
 
   const activeStats = useMemo(
     () => collectionStats(entries, activeCollection),
@@ -109,8 +127,8 @@ export function ExploreView() {
         <p className="eyebrow">Marketplace</p>
         <h1 className="page-title hero-title">Explore .arch names</h1>
         <p className="page-subtitle hero-copy">
-          Browse registered names by length — like SNS Explore. Secondary sales are not on-chain yet;
-          open any name to view records or contact the owner.
+          Browse registered names and on-chain fixed-price listings. Sellers quote ARCH lamports or
+          aBTC; buy settles atomically with ownership transfer.
         </p>
       </div>
 
@@ -133,7 +151,9 @@ export function ExploreView() {
         </div>
         <div className="explore-stat">
           <span className="explore-stat-label">Listed</span>
-          <span className="explore-stat-value mono">0</span>
+          <span className="explore-stat-value mono">
+            {loading ? "…" : globalStats.listed.toLocaleString()}
+          </span>
         </div>
       </div>
 
@@ -147,7 +167,7 @@ export function ExploreView() {
       ) : null}
 
       <div className="explore-collections" aria-label="Name collections">
-        {collectionCards.map(({ collection, stats }) => {
+        {collectionCards.map(({ collection, stats, listed }) => {
           const selected = collection.id === collectionId;
           return (
             <button
@@ -175,7 +195,7 @@ export function ExploreView() {
                 </div>
                 <div>
                   <dt>Listed</dt>
-                  <dd className="mono">0</dd>
+                  <dd className="mono">{loading ? "…" : listed.toLocaleString()}</dd>
                 </div>
               </dl>
             </button>
@@ -218,6 +238,17 @@ export function ExploreView() {
                 <option value="length-desc">Longest first</option>
               </select>
             </label>
+            <label className="explore-control explore-control-sort">
+              <span className="input-label">Filter</span>
+              <select
+                className="input"
+                value={listedOnly ? "listed" : "all"}
+                onChange={(e) => setListedOnly(e.target.value === "listed")}
+              >
+                <option value="all">All names</option>
+                <option value="listed">Listed only</option>
+              </select>
+            </label>
           </div>
         </div>
 
@@ -239,7 +270,13 @@ export function ExploreView() {
               <li key={entry.name}>
                 <Link className="explore-name-card" to={viewPathForName(entry.name)}>
                   <span className="explore-name-label mono">{entry.name}</span>
-                  <span className="explore-name-meta">Owner</span>
+                  {entry.listing ? (
+                    <span className="explore-name-price mono">
+                      {formatListingPrice(entry.listing)}
+                    </span>
+                  ) : (
+                    <span className="explore-name-meta">Not listed</span>
+                  )}
                   <span className="explore-name-owner mono" title={entry.ownerDisplay}>
                     {shortArchAddress(entry.ownerDisplay)}
                   </span>

@@ -1,5 +1,5 @@
 import { AnsError } from "../errors.js";
-import type { ArchAddress, RecordType, RecordValue } from "../types.js";
+import type { ArchAddress, QuoteCurrency, RecordType, RecordValue } from "../types.js";
 import { BorshReader } from "./reader.js";
 import { decodeRecordValue, encodeRecordValue } from "./state.js";
 import { BorshWriter } from "./writer.js";
@@ -30,9 +30,13 @@ export type NameInstruction =
       kind: "UpdateConfig";
       paused: boolean | null;
       gracePeriodSlots: bigint | null;
-    };
+    }
+  | { kind: "ListName"; nameHash: Uint8Array; currency: QuoteCurrency; price: bigint }
+  | { kind: "CancelListing"; nameHash: Uint8Array }
+  | { kind: "BuyName"; nameHash: Uint8Array };
 
 const RECORD_TYPES: RecordType[] = ["ArchOwner", "BitcoinTaproot", "TokenAta", "Text"];
+const QUOTE_CURRENCIES: QuoteCurrency[] = ["Arch", "Btc"];
 
 function encodeOptionBool(writer: BorshWriter, value: boolean | null): void {
   if (value === null) {
@@ -103,6 +107,17 @@ export function encodeInstruction(ix: NameInstruction): Uint8Array {
       encodeOptionBool(writer, ix.paused);
       encodeOptionU64(writer, ix.gracePeriodSlots);
       return writer.finish();
+    case "ListName":
+      return writer
+        .u8(10)
+        .pubkey(ix.nameHash)
+        .u8(QUOTE_CURRENCIES.indexOf(ix.currency))
+        .u64(ix.price)
+        .finish();
+    case "CancelListing":
+      return writer.u8(11).pubkey(ix.nameHash).finish();
+    case "BuyName":
+      return writer.u8(12).pubkey(ix.nameHash).finish();
   }
 }
 
@@ -176,6 +191,24 @@ export function decodeInstruction(data: Uint8Array): NameInstruction {
         paused: decodeOptionBool(reader),
         gracePeriodSlots: decodeOptionU64(reader),
       };
+      break;
+    case 10: {
+      const nameHash = reader.pubkey();
+      const currency = QUOTE_CURRENCIES[reader.u8()];
+      if (!currency) throw new AnsError("CodecError", "invalid quote currency");
+      ix = {
+        kind: "ListName",
+        nameHash,
+        currency,
+        price: reader.u64(),
+      };
+      break;
+    }
+    case 11:
+      ix = { kind: "CancelListing", nameHash: reader.pubkey() };
+      break;
+    case 12:
+      ix = { kind: "BuyName", nameHash: reader.pubkey() };
       break;
     default:
       throw new AnsError("CodecError", `unknown instruction variant ${kind}`);

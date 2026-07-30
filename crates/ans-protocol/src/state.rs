@@ -7,6 +7,7 @@ pub const REGISTRY_CONFIG_DISCRIMINATOR: [u8; 8] = *b"ANSCFG01";
 pub const NAME_ACCOUNT_DISCRIMINATOR: [u8; 8] = *b"ANSNAME1";
 pub const RECORD_ACCOUNT_DISCRIMINATOR: [u8; 8] = *b"ANSRECR1";
 pub const REVERSE_ACCOUNT_DISCRIMINATOR: [u8; 8] = *b"ANSREVR1";
+pub const LISTING_ACCOUNT_DISCRIMINATOR: [u8; 8] = *b"ANSLIST1";
 
 pub type ArchAddress = [u8; 32];
 
@@ -145,6 +146,27 @@ pub struct ReverseAccount {
     pub primary_name_hash: [u8; 32],
     pub binding_nonce: u64,
     pub updated_at_slot: u64,
+}
+
+/// Fixed-price marketplace quote asset for testnet v1.
+///
+/// - [`QuoteCurrency::Arch`] — native ARCH lamports via system transfer
+/// - [`QuoteCurrency::Btc`] — Arch Bitcoin (aBTC) SPL-token units (8 decimals)
+#[derive(Clone, Copy, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub enum QuoteCurrency {
+    Arch,
+    Btc,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct ListingAccount {
+    pub header: AccountHeader,
+    pub name_hash: [u8; 32],
+    pub seller: ArchAddress,
+    pub currency: QuoteCurrency,
+    pub price: u64,
+    pub created_at_slot: u64,
+    pub active: bool,
 }
 
 pub fn encode_state<T: BorshSerialize>(state: &T) -> Vec<u8> {
