@@ -34,6 +34,8 @@ pub enum NameInstruction {
     DeleteRecord {
         name_hash: [u8; 32],
         record_type: RecordType,
+        /// Required when `record_type` is `Text`; empty for typed records.
+        text_key: String,
         expected_revision: u64,
     },
     SetPrimary {

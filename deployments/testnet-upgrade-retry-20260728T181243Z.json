@@ -1,0 +1,26 @@
+{
+  "network": "testnet",
+  "dry_run": false,
+  "rpc_url": "https://rpc.testnet.arch.network",
+  "program_id": "3d9fbaa282268d8453a924692f254ad6c610668f36512db9fb50325ac2e4e079",
+  "deployer": "528f0c10f6b6438ffb09359a12f546b839d80785acbde339fe91f57e982cc831",
+  "namespace_authority": "58781370584ec88839f92697cb9f8cf480f6cdc810dd393e17123676ba0c313c",
+  "deployer_payer": {
+    "present": true,
+    "system_owned": true,
+    "lamports": 18718560,
+    "required_lamports": 5000000,
+    "suitable": true
+  },
+  "namespace_authority_payer": {
+    "present": true,
+    "system_owned": true,
+    "lamports": 3942068,
+    "required_lamports": 1000000,
+    "suitable": true
+  },
+  "program_deployed": false,
+  "registry_config": "29691c11fb04be3e25c5f236dc7971cbb3293fc0f7a3bed288dc4cd476320521",
+  "registry_initialized": true,
+  "transactions": []
+}

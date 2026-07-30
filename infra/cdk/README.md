@@ -1,6 +1,10 @@
 # ANS manager AWS hosting
 
 Deploys `id.arch.network` as a private S3 + CloudFront SPA with ACM and Route 53.
+The `/rpc` route uses a throttled API Gateway + Lambda proxy to call the
+authenticated Arch Explorer testnet JSON-RPC endpoint. The Explorer API key is
+read at runtime from the `ans-manager/indexer-api-key` Secrets Manager secret
+and is never included in the browser bundle.
 
 ## Estimated cost (low traffic test)
 
@@ -37,6 +41,19 @@ Then:
 npm install
 npx cdk synth
 npx cdk deploy
+```
+
+After creating or rotating the Explorer app key, update the runtime secret
+without placing the key in source control or shell history:
+
+```bash
+read -rs INDEXER_API_KEY
+echo
+printf %s "$INDEXER_API_KEY" | aws secretsmanager put-secret-value \
+  --profile internal-dns \
+  --secret-id ans-manager/indexer-api-key \
+  --secret-string file:///dev/stdin
+unset INDEXER_API_KEY
 ```
 
 First deploy already completed; subsequent deploys update the stack. Static assets are uploaded by `.github/workflows/deploy-ans-manager.yml` (or manually via `aws s3 sync`).

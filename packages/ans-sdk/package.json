@@ -1,6 +1,6 @@
 {
   "name": "@arch-network/ans-sdk",
-  "version": "0.1.0-testnet.3",
+  "version": "0.1.0-testnet.4",
   "description": "TypeScript SDK for Arch Name Service resolution and mutations",
   "publishConfig": {
     "access": "public",

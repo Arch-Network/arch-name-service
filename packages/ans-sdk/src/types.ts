@@ -39,12 +39,13 @@ export interface NameAccount {
   primaryBindingNonce: bigint;
 }
 
-export type RecordType = "ArchOwner" | "BitcoinTaproot" | "TokenAta";
+export type RecordType = "ArchOwner" | "BitcoinTaproot" | "TokenAta" | "Text";
 
 export type RecordValue =
   | { kind: "ArchOwner"; owner: ArchAddress }
   | { kind: "BitcoinTaproot"; witnessProgram: Uint8Array }
-  | { kind: "TokenAta"; tokenId: ArchAddress; ata: ArchAddress };
+  | { kind: "TokenAta"; tokenId: ArchAddress; ata: ArchAddress }
+  | { kind: "Text"; key: string; value: string };
 
 export interface RecordAccount {
   header: AccountHeader;
@@ -82,6 +83,11 @@ export interface BuiltInstruction {
   data: Uint8Array;
 }
 
+export interface AnsDeploymentFeatures {
+  /** When true, the live program accepts RecordType::Text PDAs. */
+  textRecords: boolean;
+}
+
 export interface AnsDeploymentManifest {
   network: "testnet" | "mainnet";
   rpcUrl: string;
@@ -97,4 +103,5 @@ export interface AnsDeploymentManifest {
   }>;
   mainnetEnabled: boolean;
   smokePassed?: boolean;
+  features?: AnsDeploymentFeatures;
 }

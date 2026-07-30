@@ -22,7 +22,7 @@ import { BorshReader } from "./reader.js";
 import { BorshWriter } from "./writer.js";
 
 const BITCOIN_NETWORKS: BitcoinNetwork[] = ["mainnet", "testnet", "signet", "regtest"];
-const RECORD_TYPES: RecordType[] = ["ArchOwner", "BitcoinTaproot", "TokenAta"];
+const RECORD_TYPES: RecordType[] = ["ArchOwner", "BitcoinTaproot", "TokenAta", "Text"];
 
 export function encodeHeader(header: AccountHeader, writer = new BorshWriter()): BorshWriter {
   return writer.bytes(header.discriminator).bool(header.initialized).u16(header.stateVersion);
@@ -75,6 +75,8 @@ export function encodeRecordValue(value: RecordValue, writer = new BorshWriter()
       return writer.u8(1).pubkey(value.witnessProgram);
     case "TokenAta":
       return writer.u8(2).pubkey(value.tokenId).pubkey(value.ata);
+    case "Text":
+      return writer.u8(3).string(value.key).string(value.value);
   }
 }
 
@@ -84,6 +86,9 @@ export function decodeRecordValue(reader: BorshReader): RecordValue {
   if (kind === 1) return { kind: "BitcoinTaproot", witnessProgram: reader.pubkey() };
   if (kind === 2) {
     return { kind: "TokenAta", tokenId: reader.pubkey(), ata: reader.pubkey() };
+  }
+  if (kind === 3) {
+    return { kind: "Text", key: reader.string(), value: reader.string() };
   }
   throw new AnsError("CodecError", "invalid record value");
 }

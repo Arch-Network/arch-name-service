@@ -20,6 +20,7 @@ export type NameInstruction =
       kind: "DeleteRecord";
       nameHash: Uint8Array;
       recordType: RecordType;
+      textKey: string;
       expectedRevision: bigint;
     }
   | { kind: "SetPrimary"; nameHash: Uint8Array }
@@ -31,7 +32,7 @@ export type NameInstruction =
       gracePeriodSlots: bigint | null;
     };
 
-const RECORD_TYPES: RecordType[] = ["ArchOwner", "BitcoinTaproot", "TokenAta"];
+const RECORD_TYPES: RecordType[] = ["ArchOwner", "BitcoinTaproot", "TokenAta", "Text"];
 
 function encodeOptionBool(writer: BorshWriter, value: boolean | null): void {
   if (value === null) {
@@ -90,7 +91,7 @@ export function encodeInstruction(ix: NameInstruction): Uint8Array {
     case "DeleteRecord":
       writer.u8(5).pubkey(ix.nameHash);
       encodeRecordType(writer, ix.recordType);
-      return writer.u64(ix.expectedRevision).finish();
+      return writer.string(ix.textKey).u64(ix.expectedRevision).finish();
     case "SetPrimary":
       return writer.u8(6).pubkey(ix.nameHash).finish();
     case "ClearPrimary":
@@ -152,6 +153,7 @@ export function decodeInstruction(data: Uint8Array): NameInstruction {
         kind: "DeleteRecord",
         nameHash: reader.pubkey(),
         recordType: decodeRecordType(reader),
+        textKey: reader.string(),
         expectedRevision: reader.u64(),
       };
       break;

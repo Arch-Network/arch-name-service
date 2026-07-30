@@ -8,6 +8,20 @@
   "distributionDomain": "d26kpq2jxx69vh.cloudfront.net",
   "deployRoleArn": "arn:aws:iam::920373001452:role/AnsManagerStack-GitHubDeployRoleED73FD64-UHSNglsHFV9X",
   "siteUrl": "https://id.arch.network",
-  "deployedAt": "2026-07-27T03:35:00Z",
-  "sdkVersion": "0.1.0-testnet.0"
+  "deployedAt": "2026-07-28T18:19:38Z",
+  "sdkVersion": "0.1.0-testnet.4",
+  "cloudFrontInvalidationId": "IEBY1G8MN4E5SDX7D77S1OWKND",
+  "features": {
+    "textRecords": true
+  },
+  "programUpgrade": {
+    "executed": true,
+    "additive": true,
+    "programId": "3d9fbaa282268d8453a924692f254ad6c610668f36512db9fb50325ac2e4e079",
+    "build": "cargo-build-sbf --features entrypoint",
+    "smokePassed": true,
+    "smokeLabel": "smoke1785262708.arch",
+    "note": "Existing NameAccounts preserved. Must build with --features entrypoint (without it, ELF is ~65KB and make_executable fails)."
+  },
+  "notes": "SNS-parity Text records live on-chain + Manage/Search profile UI"
 }

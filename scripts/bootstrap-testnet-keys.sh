@@ -10,7 +10,7 @@ DEFAULT_KEY_DIR="$ROOT/.ans-testnet-keys"
 KEY_DIR="$DEFAULT_KEY_DIR"
 APPLY_GITHUB_SECRETS=false
 FORCE=false
-RPC_URL="https://rpc.testnet.arch.network"
+RPC_URL="https://id.arch.network/rpc"
 REPOSITORY="Arch-Network/arch-name-service"
 
 usage() {

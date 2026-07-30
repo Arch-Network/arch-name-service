@@ -1,0 +1,53 @@
+{
+  "network": "testnet",
+  "dry_run": false,
+  "rpc_url": "https://rpc.testnet.arch.network",
+  "program_id": "3d9fbaa282268d8453a924692f254ad6c610668f36512db9fb50325ac2e4e079",
+  "deployer": "528f0c10f6b6438ffb09359a12f546b839d80785acbde339fe91f57e982cc831",
+  "namespace_authority": "58781370584ec88839f92697cb9f8cf480f6cdc810dd393e17123676ba0c313c",
+  "deployer_payer": {
+    "present": true,
+    "system_owned": true,
+    "lamports": 18274512,
+    "required_lamports": 5000000,
+    "suitable": true
+  },
+  "namespace_authority_payer": {
+    "present": true,
+    "system_owned": true,
+    "lamports": 3921038,
+    "required_lamports": 1000000,
+    "suitable": true
+  },
+  "program_deployed": true,
+  "registry_config": "29691c11fb04be3e25c5f236dc7971cbb3293fc0f7a3bed288dc4cd476320521",
+  "registry_initialized": true,
+  "smoke": {
+    "label": "smoke1785262708",
+    "canonical_name": "smoke1785262708.arch",
+    "owner": "58781370584ec88839f92697cb9f8cf480f6cdc810dd393e17123676ba0c313c",
+    "new_owner": "528f0c10f6b6438ffb09359a12f546b839d80785acbde339fe91f57e982cc831",
+    "name_account": "1296ec289ac87ac7fe7778289396eb8399f5aa3671e01166f88c87041c878941",
+    "record_account": "5ad9c9e8dec82a6895f69b4226fb522d66d28f866fb37e96d2022332511109c8",
+    "reverse_account": "c2ec33d8318d64d2428a4c90c187c18d4e4109e50a013c9f0f73955cfec3fb0c",
+    "passed": true
+  },
+  "transactions": [
+    {
+      "operation": "smoke_register",
+      "txid": "82874835a85e68e32eea5746b8afd35f4c4a2e5d9230d2045829f7b33886014f"
+    },
+    {
+      "operation": "smoke_set_record",
+      "txid": "73d592816fa2e0a56fc8466ebc4645485908ef649c971f1c0d597abd21a73da9"
+    },
+    {
+      "operation": "smoke_set_primary",
+      "txid": "a30e5c6b61e1bc90086f2b08b6406e691a0a8ffffec3c18c7fffcc4823e653eb"
+    },
+    {
+      "operation": "smoke_transfer",
+      "txid": "c4d68ea47d4f77f2d15a01c4bd2225e414f866cb16ef7e4f9ae63f4cf0535726"
+    }
+  ]
+}

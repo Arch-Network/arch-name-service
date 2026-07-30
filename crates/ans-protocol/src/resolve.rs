@@ -1,6 +1,7 @@
 use crate::{
     derive::{
-        derive_config_address, derive_name_address, derive_record_address, derive_reverse_address,
+        derive_config_address, derive_name_address, derive_record_address_for_value,
+        derive_reverse_address,
     },
     error::AnsError,
     name::{canonicalize_name, name_hash},
@@ -56,12 +57,14 @@ pub fn resolve_record(
 
     let state = &record.state;
     state.header.validate(RECORD_ACCOUNT_DISCRIMINATOR)?;
+    let text_key = state.value.text_key();
     if record.address
-        != derive_record_address(
+        != derive_record_address_for_value(
             program_id,
             &config.state.namespace,
             name.state.name_hash,
             record_type,
+            text_key,
         )
     {
         return Err(AnsError::InvalidAccountDerivation);

@@ -22,14 +22,19 @@
   --color-primary: #e8590c;
   --color-primary-hover: #cf4f0a;
   --color-primary-tint: #fcefe7;
+  --color-primary-border: #f3c3a8;
   --color-positive: #16a34a;
   --color-negative: #dc2626;
-  --color-warning: #e6a817;
+  --color-warning: #9a6700;
+  --color-info: #3b82f6;
   --surface-app: #eeeef0;
   --surface-card: #ffffff;
   --surface-header: #ffffff;
   --surface-subtle: #f1f1f3;
   --surface-input: #f4f4f6;
+  --surface-warning: #fff9e8;
+  --surface-negative: #fff1f1;
+  --surface-positive: #effbf3;
   --text-primary: #16161a;
   --text-secondary: #6e6e76;
   --text-muted: #9a9aa2;
@@ -40,11 +45,19 @@
   --border-divider: #ececef;
   --radius-pill: 999px;
   --radius-card: 16px;
-  --radius-field: 14px;
+  --radius-field: 12px;
   --radius-input: 12px;
   --radius-chip: 8px;
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-input: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
   --font-display: "Newsreader", Georgia, serif;
   --font-body: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", monospace;
@@ -55,11 +68,16 @@
   --color-primary: #f2640f;
   --color-primary-hover: #ff7a2e;
   --color-primary-tint: #2a1a10;
+  --color-primary-border: #6b3216;
+  --color-warning: #d6ad55;
   --surface-app: #0d0d0f;
   --surface-card: #16161a;
   --surface-header: #121214;
   --surface-subtle: #1c1c20;
   --surface-input: #1c1c20;
+  --surface-warning: #211d11;
+  --surface-negative: #251416;
+  --surface-positive: #102117;
   --text-primary: #f3f2ee;
   --text-secondary: #8a8a92;
   --text-muted: #6e6e76;
@@ -79,7 +97,10 @@ body {
   background: var(--surface-app);
   color: var(--text-primary);
   line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
 }
 a { color: inherit; text-decoration: none; }
 button, input, select { font: inherit; }
+button, a, input, select, summary { outline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--color-primary); }
 .mono { font-family: var(--font-mono); }

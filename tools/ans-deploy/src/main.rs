@@ -1,3 +1,4 @@
+mod idl;
 mod smoke;
 mod tx;
 
@@ -65,7 +66,7 @@ fn main() -> Result<()> {
     }
 
     let rpc_url =
-        env::var("ARCH_RPC_URL").unwrap_or_else(|_| "https://rpc.testnet.arch.network".to_owned());
+        env::var("ARCH_RPC_URL").unwrap_or_else(|_| "https://id.arch.network/rpc".to_owned());
     let program_path = required("PROGRAM_KEY_PATH")?;
     let deployer_path = required("DEPLOYER_KEY_PATH")?;
     let authority_path = required("NAMESPACE_AUTHORITY_KEY_PATH")?;
@@ -246,6 +247,45 @@ fn main() -> Result<()> {
                 println!("Smoke lifecycle passed (register → record → primary → transfer).");
             }
         }
+        "publish-idl" => {
+            if dry_run {
+                println!("DRY RUN: IDL publish transactions not sent.");
+            } else {
+                require_deploy_payer(&deployment.deployer_payer)?;
+                if !program_deployed {
+                    bail!("ANS registry program is not executable; deploy/upgrade before publish-idl");
+                }
+                let idl_path = env::var("IDL_PATH")
+                    .unwrap_or_else(|_| "idl/ans_registry.json".to_owned());
+                let mode = match env::var("IDL_MODE")
+                    .unwrap_or_else(|_| "auto".to_owned())
+                    .to_ascii_lowercase()
+                    .as_str()
+                {
+                    "init" => idl::PublishMode::Init,
+                    "upgrade" => idl::PublishMode::Upgrade,
+                    "auto" => idl::PublishMode::Auto,
+                    other => bail!("IDL_MODE must be init|upgrade|auto (got {other})"),
+                };
+                let txids = idl::publish(
+                    &client,
+                    &config,
+                    program_id,
+                    deployer,
+                    deployer_keypair,
+                    &idl_path,
+                    mode,
+                )?;
+                for txid in txids {
+                    deployment.transactions.push(TransactionRecord {
+                        operation: "publish_idl".to_owned(),
+                        txid,
+                    });
+                }
+                fs::write(&output_path, serde_json::to_vec_pretty(&deployment)?)?;
+                println!("IDL publish completed.");
+            }
+        }
         _ => unreachable!("parse_args validates action"),
     }
     Ok(())
@@ -257,9 +297,11 @@ fn parse_args() -> Result<(String, bool)> {
     for arg in env::args().skip(1) {
         match arg.as_str() {
             "--dry-run" => dry_run = true,
-            "preflight" | "fund" | "deploy" | "initialize" | "smoke" => action = arg,
+            "preflight" | "fund" | "deploy" | "initialize" | "smoke" | "publish-idl" => {
+                action = arg
+            }
             _ => bail!(
-                "usage: ans-deploy [preflight|fund|deploy|initialize|smoke] [--dry-run]"
+                "usage: ans-deploy [preflight|fund|deploy|initialize|smoke|publish-idl] [--dry-run]"
             ),
         }
     }

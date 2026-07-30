@@ -8,7 +8,7 @@ import {
 import {
   deriveConfigAddress,
   deriveNameAddress,
-  deriveRecordAddress,
+  deriveRecordAddressFor,
   deriveReverseAddress,
 } from "./derive.js";
 import { AnsError } from "./errors.js";
@@ -86,15 +86,21 @@ export function resolveRecord(
   record: AccountAt<RecordAccount>,
   recordType: RecordType,
   currentSlot: bigint,
+  textKey?: string,
 ): RecordValue {
   validateConfig(programId, config);
   validateName(programId, config.state, requestedName, name, currentSlot);
   validateHeader(record.state.header, RECORD_ACCOUNT_DISCRIMINATOR);
-  const expected = deriveRecordAddress(
+  const key =
+    recordType === "Text"
+      ? textKey ?? (record.state.value.kind === "Text" ? record.state.value.key : undefined)
+      : undefined;
+  const expected = deriveRecordAddressFor(
     programId,
     config.state.namespace,
     name.state.nameHash,
     recordType,
+    key,
   );
   if (!bytesEqual(record.address, expected)) {
     throw new AnsError("InvalidAccountDerivation");

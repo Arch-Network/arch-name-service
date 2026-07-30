@@ -17,6 +17,13 @@ export type ProcessedTransaction = {
 
 export interface AnsTransport {
   readAccountInfo(pubkey: Uint8Array | string): Promise<AccountInfo | null>;
+  /**
+   * Batch-read accounts by pubkey. Missing accounts are `null` at the same
+   * index. Preferred over N× `readAccountInfo` for profile/catalog loads.
+   */
+  getMultipleAccounts?(
+    pubkeys: Array<Uint8Array | string>,
+  ): Promise<Array<AccountInfo | null>>;
   getProgramAccounts?(
     programId: Uint8Array | string,
     filters?: Array<{ DataSize: number } | { DataContent: { offset: number; bytes: number[] } }>,

@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: "Inspect, fund payer accounts, deploy/upgrade, initialize, or smoke-test the registry"
+        description: "Inspect, fund payer accounts, deploy/upgrade, initialize, publish IDL, or smoke-test the registry"
         type: choice
         required: true
         default: preflight
-        options: [preflight, fund, deploy, upgrade, initialize, smoke]
+        options: [preflight, fund, deploy, upgrade, initialize, publish-idl, smoke]
       dry_run:
         description: "Print the deployment manifest without sending transactions"
         type: boolean
@@ -60,7 +60,7 @@ jobs:
             echo "PROGRAM_KEY_PATH=$KEYS/program.json"
             echo "DEPLOYER_KEY_PATH=$KEYS/deployer.json"
             echo "NAMESPACE_AUTHORITY_KEY_PATH=$KEYS/namespace-authority.json"
-            echo "ARCH_RPC_URL=${CI_ARCH_RPC_URL:-https://rpc.testnet.arch.network}"
+            echo "ARCH_RPC_URL=${CI_ARCH_RPC_URL:-https://id.arch.network/rpc}"
           } >> "$GITHUB_ENV"
 
       - name: Build deploy tool
@@ -89,7 +89,7 @@ jobs:
           set -euo pipefail
           mkdir -p deployments
           case "${{ inputs.operation }}" in
-            preflight|fund|initialize|smoke)
+            preflight|fund|initialize|smoke|publish-idl)
               ACTION="${{ inputs.operation }}"
               ;;
             deploy|upgrade)
