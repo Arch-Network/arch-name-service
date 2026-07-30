@@ -4,6 +4,7 @@ import bs58 from "bs58";
 import { StatusNotice } from "../components/StatusNotice";
 import { ansClient } from "../lib/ans";
 import { shortArchAddress } from "../lib/arch-identity";
+import { formatQuoteAmount } from "../lib/domain-profile";
 import {
   MARKETPLACE_COLLECTIONS,
   collectionStats,
@@ -23,11 +24,6 @@ function formatCapacity(registered: number, capacity: number | null): string {
   return `${registered.toLocaleString()} / ${capacity.toLocaleString()}`;
 }
 
-function formatListingPrice(listing: NonNullable<MarketplaceEntry["listing"]>): string {
-  const unit = listing.currency === "Btc" ? "aBTC" : "ARCH";
-  return `${listing.price.toString()} ${unit}`;
-}
-
 export function ExploreView() {
   const [searchParams, setSearchParams] = useSearchParams();
   const collectionId = parseCollectionId(searchParams.get("collection"));
@@ -36,7 +32,7 @@ export function ExploreView() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<MarketplaceSort>("name-asc");
-  const [listedOnly, setListedOnly] = useState(false);
+  const [listedOnly, setListedOnly] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,7 +82,7 @@ export function ExploreView() {
     };
   }, [entries]);
 
-  const collectionCards = useMemo(
+  const collectionFilters = useMemo(
     () =>
       MARKETPLACE_COLLECTIONS.map((collection) => {
         const stats = collectionStats(entries, collection);
@@ -108,11 +104,6 @@ export function ExploreView() {
     return sortMarketplaceEntries(rows, sort);
   }, [collectionId, entries, listedOnly, query, sort]);
 
-  const activeStats = useMemo(
-    () => collectionStats(entries, activeCollection),
-    [activeCollection, entries],
-  );
-
   function selectCollection(id: CollectionId) {
     if (id === "all") {
       setSearchParams({}, { replace: true });
@@ -127,8 +118,8 @@ export function ExploreView() {
         <p className="eyebrow">Marketplace</p>
         <h1 className="page-title hero-title">Explore .arch names</h1>
         <p className="page-subtitle hero-copy">
-          Browse registered names and on-chain fixed-price listings. Sellers quote ARCH lamports or
-          aBTC; buy settles atomically with ownership transfer.
+          Browse names listed by their owners. Fixed-price purchases settle on-chain with ownership
+          transfer.
         </p>
       </div>
 
@@ -167,51 +158,37 @@ export function ExploreView() {
       ) : null}
 
       <div className="explore-collections" aria-label="Name collections">
-        {collectionCards.map(({ collection, stats, listed }) => {
+        {collectionFilters.map(({ collection, stats, listed }) => {
           const selected = collection.id === collectionId;
           return (
             <button
               key={collection.id}
               type="button"
-              className={`explore-collection-card${selected ? " is-selected" : ""}`}
+              className={`explore-collection-filter${selected ? " is-selected" : ""}`}
               onClick={() => selectCollection(collection.id)}
               aria-pressed={selected}
             >
-              <div className="explore-collection-top">
-                <h2 className="explore-collection-title">{collection.title}</h2>
-                <span className="count-badge">
-                  {loading ? "…" : formatCapacity(stats.registered, stats.capacity)}
-                </span>
-              </div>
-              <p className="explore-collection-copy">{collection.description}</p>
-              <dl className="explore-collection-metrics">
-                <div>
-                  <dt>Registered</dt>
-                  <dd className="mono">{loading ? "…" : stats.registered.toLocaleString()}</dd>
-                </div>
-                <div>
-                  <dt>Owners</dt>
-                  <dd className="mono">{loading ? "…" : stats.owners.toLocaleString()}</dd>
-                </div>
-                <div>
-                  <dt>Listed</dt>
-                  <dd className="mono">{loading ? "…" : listed.toLocaleString()}</dd>
-                </div>
-              </dl>
+              <span className="explore-collection-title">{collection.title}</span>
+              <span className="explore-collection-count mono">
+                {loading
+                  ? "…"
+                  : listedOnly
+                    ? listed.toLocaleString()
+                    : formatCapacity(stats.registered, stats.capacity)}
+              </span>
             </button>
           );
         })}
       </div>
 
-      <div className="card explore-browse">
+      <div className="explore-browse">
         <div className="explore-browse-header">
           <div>
-            <p className="eyebrow">Collection</p>
             <h2 className="card-title">{activeCollection.title}</h2>
             <p className="explore-browse-sub">
               {loading
                 ? "Loading names…"
-                : `${activeStats.registered.toLocaleString()} registered · ${visible.length.toLocaleString()} shown`}
+                : `${visible.length.toLocaleString()} ${listedOnly ? "active listings" : "registered names"}`}
             </p>
           </div>
           <div className="explore-browse-controls">
@@ -245,8 +222,8 @@ export function ExploreView() {
                 value={listedOnly ? "listed" : "all"}
                 onChange={(e) => setListedOnly(e.target.value === "listed")}
               >
-                <option value="all">All names</option>
-                <option value="listed">Listed only</option>
+                <option value="listed">For sale</option>
+                <option value="all">All registered</option>
               </select>
             </label>
           </div>
@@ -265,25 +242,45 @@ export function ExploreView() {
             ) : null}
           </p>
         ) : (
-          <ul className="explore-grid">
-            {visible.map((entry) => (
-              <li key={entry.name}>
-                <Link className="explore-name-card" to={viewPathForName(entry.name)}>
-                  <span className="explore-name-label mono">{entry.name}</span>
-                  {entry.listing ? (
-                    <span className="explore-name-price mono">
-                      {formatListingPrice(entry.listing)}
+          <>
+            <div className="explore-list-head" aria-hidden="true">
+              <span>Name</span>
+              <span>Owner</span>
+              <span>Status</span>
+              <span>Price</span>
+              <span />
+            </div>
+            <ul className="explore-list">
+              {visible.map((entry) => (
+                <li key={entry.name}>
+                  <Link className="explore-name-row" to={viewPathForName(entry.name)}>
+                    <span className="explore-name-identity">
+                      <span className="explore-name-avatar" aria-hidden="true">
+                        {entry.name.slice(0, 2).toUpperCase()}
+                      </span>
+                      <span className="explore-name-label mono">{entry.name}</span>
                     </span>
-                  ) : (
-                    <span className="explore-name-meta">Not listed</span>
-                  )}
-                  <span className="explore-name-owner mono" title={entry.ownerDisplay}>
-                    {shortArchAddress(entry.ownerDisplay)}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                    <span className="explore-name-owner mono" title={entry.ownerDisplay}>
+                      {shortArchAddress(entry.ownerDisplay)}
+                    </span>
+                    {entry.listing ? (
+                      <span className="explore-listing-status">For sale</span>
+                    ) : (
+                      <span className="explore-unlisted-status">Registered</span>
+                    )}
+                    {entry.listing ? (
+                      <span className="explore-name-price mono">
+                        {formatQuoteAmount(entry.listing.price, entry.listing.currency)}
+                      </span>
+                    ) : (
+                      <span className="explore-name-meta">—</span>
+                    )}
+                    <span className="explore-row-action" aria-hidden="true">→</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
         )}
       </div>
     </section>
