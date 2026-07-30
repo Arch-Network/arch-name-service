@@ -1,7 +1,9 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use ans_protocol::{
-    derive::{derive_name_address, derive_record_address, derive_reverse_address},
+    derive::{
+        derive_listing_address, derive_name_address, derive_record_address, derive_reverse_address,
+    },
     name::name_hash,
     resolve::{resolve_owner, resolve_primary, resolve_record, AccountAt},
     state::{decode_state, NameAccount, RecordAccount, RecordType, RecordValue, ReverseAccount},
@@ -224,6 +226,14 @@ pub fn run_smoke(
             AccountMeta::new(owner, true),
             AccountMeta::new_readonly(registry_config, false),
             AccountMeta::new(name_account, false),
+            AccountMeta::new_readonly(
+                Pubkey::new_from_array(derive_listing_address(
+                    program_id.serialize(),
+                    TESTNET_NAMESPACE,
+                    hash,
+                )),
+                false,
+            ),
         ],
         data: to_vec(&NameInstruction::Transfer {
             name_hash: hash,

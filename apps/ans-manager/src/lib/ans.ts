@@ -78,10 +78,20 @@ export const ansClient = {
     getAnsClient().listNameAccounts(...args),
   listRecentNames: (...args: Parameters<AnsClient["listRecentNames"]>) =>
     getAnsClient().listRecentNames(...args),
+  listActiveListings: (...args: Parameters<AnsClient["listActiveListings"]>) =>
+    getAnsClient().listActiveListings(...args),
+  fetchListing: (...args: Parameters<AnsClient["fetchListing"]>) =>
+    getAnsClient().fetchListing(...args),
   buildRegister: (...args: Parameters<AnsClient["buildRegister"]>) =>
     getAnsClient().buildRegister(...args),
   buildTransfer: (...args: Parameters<AnsClient["buildTransfer"]>) =>
     getAnsClient().buildTransfer(...args),
+  buildListName: (...args: Parameters<AnsClient["buildListName"]>) =>
+    getAnsClient().buildListName(...args),
+  buildCancelListing: (...args: Parameters<AnsClient["buildCancelListing"]>) =>
+    getAnsClient().buildCancelListing(...args),
+  buildBuyName: (...args: Parameters<AnsClient["buildBuyName"]>) =>
+    getAnsClient().buildBuyName(...args),
   buildSetRecord: (...args: Parameters<AnsClient["buildSetRecord"]>) =>
     getAnsClient().buildSetRecord(...args),
   buildSetPrimary: (...args: Parameters<AnsClient["buildSetPrimary"]>) =>
@@ -282,6 +292,9 @@ export const MANAGE_ACTIONS = {
   setArchOwner: "Updated Arch wallet record",
   setTaproot: "Updated Bitcoin Taproot record",
   transfer: "Transferred name",
+  list: "Listed name for sale",
+  cancelListing: "Cancelled listing",
+  buy: "Purchased name",
   register: "Register name",
 } as const;
 
@@ -291,6 +304,9 @@ const FAILURE_TITLES: Record<string, string> = {
   [MANAGE_ACTIONS.setArchOwner]: "Update Arch wallet record failed",
   [MANAGE_ACTIONS.setTaproot]: "Update Taproot record failed",
   [MANAGE_ACTIONS.transfer]: "Transfer failed",
+  [MANAGE_ACTIONS.list]: "List for sale failed",
+  [MANAGE_ACTIONS.cancelListing]: "Cancel listing failed",
+  [MANAGE_ACTIONS.buy]: "Purchase failed",
   [MANAGE_ACTIONS.register]: "Registration failed",
 };
 
@@ -300,6 +316,9 @@ const RETRY_LABELS: Record<string, string> = {
   [MANAGE_ACTIONS.setArchOwner]: "Use connected wallet",
   [MANAGE_ACTIONS.setTaproot]: "Update Taproot record",
   [MANAGE_ACTIONS.transfer]: "Transfer name",
+  [MANAGE_ACTIONS.list]: "List for sale",
+  [MANAGE_ACTIONS.cancelListing]: "Cancel listing",
+  [MANAGE_ACTIONS.buy]: "Buy name",
   [MANAGE_ACTIONS.register]: "Register",
 };
 

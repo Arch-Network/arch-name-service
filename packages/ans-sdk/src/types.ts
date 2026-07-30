@@ -66,6 +66,18 @@ export interface ReverseAccount {
   updatedAtSlot: bigint;
 }
 
+export type QuoteCurrency = "Arch" | "Btc";
+
+export interface ListingAccount {
+  header: AccountHeader;
+  nameHash: Uint8Array;
+  seller: ArchAddress;
+  currency: QuoteCurrency;
+  price: bigint;
+  createdAtSlot: bigint;
+  active: boolean;
+}
+
 export interface AccountAt<T> {
   address: ArchAddress;
   state: T;

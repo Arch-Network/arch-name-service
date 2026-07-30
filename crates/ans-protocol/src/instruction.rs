@@ -1,6 +1,6 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
-use crate::state::{ArchAddress, RecordType, RecordValue};
+use crate::state::{ArchAddress, QuoteCurrency, RecordType, RecordValue};
 
 /// Borsh instruction payloads for the future Arch program. Authorization and
 /// account ordering are intentionally enforced by the program implementation,
@@ -49,5 +49,21 @@ pub enum NameInstruction {
     UpdateConfig {
         paused: Option<bool>,
         grace_period_slots: Option<u64>,
+    },
+    /// Create a fixed-price listing. Seller remains name owner; an active
+    /// listing blocks ordinary `Transfer` until cancel or buy.
+    ListName {
+        name_hash: [u8; 32],
+        currency: QuoteCurrency,
+        price: u64,
+    },
+    /// Seller cancels an active listing.
+    CancelListing {
+        name_hash: [u8; 32],
+    },
+    /// Buyer purchases an active listing. Payment asset is taken from the
+    /// listing currency (ARCH lamports or aBTC token transfer).
+    BuyName {
+        name_hash: [u8; 32],
     },
 }

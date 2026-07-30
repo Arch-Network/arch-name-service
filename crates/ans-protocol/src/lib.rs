@@ -16,6 +16,6 @@ pub use error::AnsError;
 pub use instruction::NameInstruction;
 pub use resolve::{resolve_owner, resolve_primary, resolve_record, AccountAt};
 pub use state::{
-    ArchAddress, BitcoinNetwork, NameAccount, RecordAccount, RecordType, RecordValue,
-    RegistryConfig, ReverseAccount,
+    ArchAddress, BitcoinNetwork, ListingAccount, NameAccount, QuoteCurrency, RecordAccount,
+    RecordType, RecordValue, RegistryConfig, ReverseAccount,
 };

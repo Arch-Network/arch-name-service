@@ -4,6 +4,10 @@ export type MarketplaceEntry = {
   name: string;
   ownerDisplay: string;
   registeredAtSlot: bigint;
+  listing?: {
+    currency: "Arch" | "Btc";
+    price: bigint;
+  } | null;
 };
 
 export type CollectionId =
@@ -166,6 +170,10 @@ export function sortMarketplaceEntries(
     }
   });
   return next;
+}
+
+export function listedCount(entries: ReadonlyArray<MarketplaceEntry>): number {
+  return entries.filter((e) => !!e.listing).length;
 }
 
 export function explorePathForCollection(collectionId: CollectionId = "all"): string {

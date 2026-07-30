@@ -38,4 +38,10 @@ pub enum AnsError {
     InvalidTextRecord,
     #[error("reverse account does not point to the active owner and name")]
     InvalidReverseBinding,
+    #[error("name already has an active marketplace listing")]
+    ListingActive,
+    #[error("marketplace listing is missing or inactive")]
+    ListingInactive,
+    #[error("marketplace listing price must be greater than zero")]
+    InvalidListingPrice,
 }

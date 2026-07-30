@@ -2,20 +2,21 @@
 
 use ans_protocol::{
     derive::{
-        derive_config_address, derive_name_address, derive_record_address_for_value,
-        derive_reverse_address, namespace_hash, record_key_hash,
+        derive_config_address, derive_listing_address, derive_name_address,
+        derive_record_address_for_value, derive_reverse_address, namespace_hash, record_key_hash,
     },
     instruction::NameInstruction,
     name::validate_label,
     state::{
-        decode_state, encode_state, AccountHeader, ArchAddress, BitcoinNetwork, RecordAccount,
-        RecordType, RecordValue, RegistryConfig, NAME_ACCOUNT_DISCRIMINATOR,
-        REGISTRY_CONFIG_DISCRIMINATOR,
+        decode_state, encode_state, AccountHeader, ArchAddress, BitcoinNetwork, ListingAccount,
+        QuoteCurrency, RecordAccount, RecordType, RecordValue, RegistryConfig,
+        LISTING_ACCOUNT_DISCRIMINATOR, NAME_ACCOUNT_DISCRIMINATOR, REGISTRY_CONFIG_DISCRIMINATOR,
     },
 };
 use arch_program::{
-    account::AccountInfo,
-    program::{invoke_signed_unchecked, next_account_info},
+    account::{AccountInfo, AccountMeta},
+    instruction::Instruction,
+    program::{invoke, invoke_signed_unchecked, next_account_info},
     program_error::ProgramError,
     pubkey::Pubkey,
     rent::minimum_rent,
@@ -25,12 +26,24 @@ use borsh::BorshDeserialize;
 
 mod availability;
 mod idl;
+mod marketplace;
 mod transition;
 #[cfg(test)]
 mod transition_tests;
 
 const TESTNET_NAMESPACE: &str = ".arch";
 const TESTNET_NETWORK_ID: u32 = 2;
+/// Arch Token program (`TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk`).
+const TOKEN_PROGRAM_ID_BYTES: [u8; 32] = [
+    6, 221, 246, 225, 185, 234, 132, 65, 44, 16, 184, 223, 2, 28, 16, 15, 200, 135, 25, 7, 195, 9,
+    195, 53, 53, 222, 32, 156, 52, 23, 99, 191,
+];
+/// Testnet aBTC mint (Arch Bitcoin, 8 decimals).
+const TESTNET_ABTC_MINT: [u8; 32] = [
+    0x72, 0x61, 0x79, 0xcf, 0x49, 0xb6, 0xdc, 0x40, 0x7c, 0x14, 0x38, 0xce, 0xc9, 0x88, 0x15, 0xd9,
+    0x22, 0x77, 0xb6, 0x25, 0xb0, 0x9d, 0xe8, 0x18, 0x18, 0xf5, 0xf3, 0xa5, 0x79, 0x89, 0xf1, 0xf1,
+];
+const SPL_TOKEN_TRANSFER_TAG: u8 = 3;
 
 #[cfg(feature = "entrypoint")]
 arch_program::entrypoint!(process_instruction);
@@ -86,6 +99,15 @@ pub fn process_instruction<'a>(
         ),
         NameInstruction::SetPrimary { name_hash } => set_primary(program_id, accounts, name_hash),
         NameInstruction::ClearPrimary => clear_primary(program_id, accounts),
+        NameInstruction::ListName {
+            name_hash,
+            currency,
+            price,
+        } => list_name(program_id, accounts, name_hash, currency, price),
+        NameInstruction::CancelListing { name_hash } => {
+            cancel_listing(program_id, accounts, name_hash)
+        }
+        NameInstruction::BuyName { name_hash } => buy_name(program_id, accounts, name_hash),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
@@ -201,10 +223,19 @@ fn transfer(
     let owner = next_account_info(iterator)?;
     let config_account = next_account_info(iterator)?;
     let name_account = next_account_info(iterator)?;
+    let listing_account = next_account_info(iterator)?;
     require_signer(owner)?;
     let config = load_config(program_id, config_account)?;
+    ensure_unpaused(&config)?;
     let mut name = load_name(program_id, name_account, &config, name_hash)?;
     require_owner(owner, &name.owner)?;
+    require_address(
+        listing_account,
+        derive_listing_address(program_id.serialize(), &config.namespace, name_hash),
+    )?;
+    if listing_is_active(listing_account)? {
+        return Err(ProgramError::Custom(2));
+    }
     transition::transfer(&mut name, new_owner);
     store(owner, name_account, &name)
 }
@@ -419,6 +450,211 @@ fn clear_primary(program_id: &Pubkey, accounts: &[AccountInfo]) -> Result<(), Pr
     let reverse = load::<ans_protocol::ReverseAccount>(reverse_account)?;
     require_owner(owner, &reverse.owner)?;
     reverse_account.realloc(0, false)
+}
+
+fn list_name(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    name_hash: [u8; 32],
+    currency: QuoteCurrency,
+    price: u64,
+) -> Result<(), ProgramError> {
+    if price == 0 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let iterator = &mut accounts.iter();
+    let seller = next_account_info(iterator)?;
+    let config_account = next_account_info(iterator)?;
+    let name_account = next_account_info(iterator)?;
+    let listing_account = next_account_info(iterator)?;
+    require_signer(seller)?;
+    let config = load_config(program_id, config_account)?;
+    ensure_unpaused(&config)?;
+    let name = load_name(program_id, name_account, &config, name_hash)?;
+    require_owner(seller, &name.owner)?;
+    let listing_address =
+        derive_listing_address(program_id.serialize(), &config.namespace, name_hash);
+    require_address(listing_account, listing_address)?;
+    if listing_is_active(listing_account)? {
+        return Err(ProgramError::Custom(2));
+    }
+    let listing = marketplace::create_listing(name_hash, name.owner, currency, price);
+    let bytes = encode_state(&listing);
+    let namespace = namespace_hash(TESTNET_NAMESPACE);
+    let seeds: [&[u8]; 3] = [b"ans:listing:v1", namespace.as_slice(), name_hash.as_slice()];
+    if listing_account.owner == program_id {
+        // Re-list into an existing deactivated listing PDA.
+    } else if listing_account.data_is_empty() {
+        create_pda(
+            program_id,
+            seller,
+            listing_account,
+            accounts,
+            &seeds,
+            bytes.len(),
+        )?;
+    } else {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    store(seller, listing_account, &listing)
+}
+
+fn cancel_listing(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    name_hash: [u8; 32],
+) -> Result<(), ProgramError> {
+    let iterator = &mut accounts.iter();
+    let seller = next_account_info(iterator)?;
+    let config_account = next_account_info(iterator)?;
+    let name_account = next_account_info(iterator)?;
+    let listing_account = next_account_info(iterator)?;
+    require_signer(seller)?;
+    let config = load_config(program_id, config_account)?;
+    ensure_unpaused(&config)?;
+    let name = load_name(program_id, name_account, &config, name_hash)?;
+    require_owner(seller, &name.owner)?;
+    let mut listing = load_active_listing(program_id, listing_account, &config, name_hash)?;
+    if listing.seller != name.owner {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    marketplace::deactivate_listing(&mut listing);
+    store(seller, listing_account, &listing)
+}
+
+fn buy_name(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    name_hash: [u8; 32],
+) -> Result<(), ProgramError> {
+    let iterator = &mut accounts.iter();
+    let buyer = next_account_info(iterator)?;
+    let seller = next_account_info(iterator)?;
+    let config_account = next_account_info(iterator)?;
+    let name_account = next_account_info(iterator)?;
+    let listing_account = next_account_info(iterator)?;
+    require_signer(buyer)?;
+    let config = load_config(program_id, config_account)?;
+    ensure_unpaused(&config)?;
+    let mut name = load_name(program_id, name_account, &config, name_hash)?;
+    let mut listing = load_active_listing(program_id, listing_account, &config, name_hash)?;
+    if name.owner != listing.seller {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    if seller.key.serialize() != listing.seller {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    if buyer.key.serialize() == listing.seller {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    match listing.currency {
+        QuoteCurrency::Arch => {
+            transfer_lamports(buyer, seller, listing.price)?;
+        }
+        QuoteCurrency::Btc => {
+            let buyer_ata = next_account_info(iterator)?;
+            let seller_ata = next_account_info(iterator)?;
+            let mint = next_account_info(iterator)?;
+            let token_program = next_account_info(iterator)?;
+            if mint.key.serialize() != TESTNET_ABTC_MINT {
+                return Err(ProgramError::InvalidAccountData);
+            }
+            if token_program.key.serialize() != TOKEN_PROGRAM_ID_BYTES {
+                return Err(ProgramError::IncorrectProgramId);
+            }
+            transfer_abtc(
+                buyer,
+                buyer_ata,
+                seller_ata,
+                mint,
+                token_program,
+                listing.price,
+            )?;
+        }
+    }
+    transition::transfer(&mut name, buyer.key.serialize());
+    marketplace::deactivate_listing(&mut listing);
+    store(buyer, name_account, &name)?;
+    store(buyer, listing_account, &listing)
+}
+
+fn transfer_lamports(
+    from: &AccountInfo,
+    to: &AccountInfo,
+    amount: u64,
+) -> Result<(), ProgramError> {
+    let mut from_lamports = from.try_borrow_mut_lamports()?;
+    let mut to_lamports = to.try_borrow_mut_lamports()?;
+    if **from_lamports < amount {
+        return Err(ProgramError::InsufficientFunds);
+    }
+    **from_lamports -= amount;
+    **to_lamports = to_lamports
+        .checked_add(amount)
+        .ok_or(ProgramError::InsufficientFunds)?;
+    Ok(())
+}
+
+fn transfer_abtc<'a>(
+    authority: &AccountInfo<'a>,
+    source: &AccountInfo<'a>,
+    destination: &AccountInfo<'a>,
+    mint: &AccountInfo<'a>,
+    token_program: &AccountInfo<'a>,
+    amount: u64,
+) -> Result<(), ProgramError> {
+    let mut data = Vec::with_capacity(9);
+    data.push(SPL_TOKEN_TRANSFER_TAG);
+    data.extend_from_slice(&amount.to_le_bytes());
+    let ix = Instruction {
+        program_id: *token_program.key,
+        accounts: vec![
+            AccountMeta::new(*source.key, false),
+            AccountMeta::new(*destination.key, false),
+            AccountMeta::new_readonly(*authority.key, true),
+        ],
+        data,
+    };
+    // Keep mint in the account metas passed to invoke for token programs that
+    // expect remaining accounts; classic SPL Transfer does not require it.
+    let _ = mint;
+    invoke(&ix, &[source.clone(), destination.clone(), authority.clone()])
+}
+
+fn listing_is_active(account: &AccountInfo) -> Result<bool, ProgramError> {
+    if account.owner == &Pubkey::system_program() || account.data_is_empty() {
+        return Ok(false);
+    }
+    let listing = load::<ListingAccount>(account)?;
+    listing
+        .header
+        .validate(LISTING_ACCOUNT_DISCRIMINATOR)
+        .map_err(|_| ProgramError::InvalidAccountData)?;
+    Ok(listing.active)
+}
+
+fn load_active_listing(
+    program_id: &Pubkey,
+    account: &AccountInfo,
+    config: &RegistryConfig,
+    name_hash: [u8; 32],
+) -> Result<ListingAccount, ProgramError> {
+    if account.owner != program_id {
+        return Err(ProgramError::IncorrectProgramId);
+    }
+    let listing = load::<ListingAccount>(account)?;
+    listing
+        .header
+        .validate(LISTING_ACCOUNT_DISCRIMINATOR)
+        .map_err(|_| ProgramError::InvalidAccountData)?;
+    if listing.name_hash != name_hash || !listing.active {
+        return Err(ProgramError::Custom(3));
+    }
+    require_address(
+        account,
+        derive_listing_address(program_id.serialize(), &config.namespace, name_hash),
+    )?;
+    Ok(listing)
 }
 
 fn load_config(program_id: &Pubkey, account: &AccountInfo) -> Result<RegistryConfig, ProgramError> {

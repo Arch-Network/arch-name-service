@@ -1,6 +1,11 @@
 import { encodeInstruction } from "../codec/instruction.js";
-import { SYSTEM_PROGRAM_ID } from "../constants.js";
 import {
+  SYSTEM_PROGRAM_ID,
+  TESTNET_ABTC_MINT,
+  TOKEN_PROGRAM_ID,
+} from "../constants.js";
+import {
+  deriveListingAddress,
   deriveNameAddress,
   deriveRecordAddressFor,
   deriveReverseAddress,
@@ -9,6 +14,7 @@ import { nameHash } from "../name.js";
 import type {
   ArchAddress,
   BuiltInstruction,
+  QuoteCurrency,
   RecordType,
   RecordValue,
 } from "../types.js";
@@ -53,17 +59,116 @@ export function buildTransferInstruction(params: {
 }): BuiltInstruction {
   const hash = nameHash(params.name);
   const nameAccount = deriveNameAddress(params.programId, params.namespace, hash);
+  const listingAccount = deriveListingAddress(params.programId, params.namespace, hash);
   return {
     programId: params.programId,
     accounts: [
       meta(params.owner, true, true),
       meta(params.registryConfig, false, false),
       meta(nameAccount, false, true),
+      meta(listingAccount, false, false),
     ],
     data: encodeInstruction({
       kind: "Transfer",
       nameHash: hash,
       newOwner: params.newOwner,
+    }),
+  };
+}
+
+export function buildListNameInstruction(params: {
+  programId: ArchAddress;
+  seller: ArchAddress;
+  registryConfig: ArchAddress;
+  namespace: string;
+  name: string;
+  currency: QuoteCurrency;
+  price: bigint;
+}): BuiltInstruction {
+  const hash = nameHash(params.name);
+  const nameAccount = deriveNameAddress(params.programId, params.namespace, hash);
+  const listingAccount = deriveListingAddress(params.programId, params.namespace, hash);
+  return {
+    programId: params.programId,
+    accounts: [
+      meta(params.seller, true, true),
+      meta(params.registryConfig, false, false),
+      meta(nameAccount, false, false),
+      meta(listingAccount, false, true),
+      meta(SYSTEM_PROGRAM_ID, false, false),
+    ],
+    data: encodeInstruction({
+      kind: "ListName",
+      nameHash: hash,
+      currency: params.currency,
+      price: params.price,
+    }),
+  };
+}
+
+export function buildCancelListingInstruction(params: {
+  programId: ArchAddress;
+  seller: ArchAddress;
+  registryConfig: ArchAddress;
+  namespace: string;
+  name: string;
+}): BuiltInstruction {
+  const hash = nameHash(params.name);
+  const nameAccount = deriveNameAddress(params.programId, params.namespace, hash);
+  const listingAccount = deriveListingAddress(params.programId, params.namespace, hash);
+  return {
+    programId: params.programId,
+    accounts: [
+      meta(params.seller, true, true),
+      meta(params.registryConfig, false, false),
+      meta(nameAccount, false, false),
+      meta(listingAccount, false, true),
+    ],
+    data: encodeInstruction({
+      kind: "CancelListing",
+      nameHash: hash,
+    }),
+  };
+}
+
+export function buildBuyNameInstruction(params: {
+  programId: ArchAddress;
+  buyer: ArchAddress;
+  seller: ArchAddress;
+  registryConfig: ArchAddress;
+  namespace: string;
+  name: string;
+  currency: QuoteCurrency;
+  buyerAta?: ArchAddress;
+  sellerAta?: ArchAddress;
+}): BuiltInstruction {
+  const hash = nameHash(params.name);
+  const nameAccount = deriveNameAddress(params.programId, params.namespace, hash);
+  const listingAccount = deriveListingAddress(params.programId, params.namespace, hash);
+  const accounts = [
+    meta(params.buyer, true, true),
+    meta(params.seller, false, true),
+    meta(params.registryConfig, false, false),
+    meta(nameAccount, false, true),
+    meta(listingAccount, false, true),
+  ];
+  if (params.currency === "Btc") {
+    if (!params.buyerAta || !params.sellerAta) {
+      throw new Error("BTC purchases require buyer and seller aBTC ATAs");
+    }
+    accounts.push(
+      meta(params.buyerAta, false, true),
+      meta(params.sellerAta, false, true),
+      meta(TESTNET_ABTC_MINT, false, false),
+      meta(TOKEN_PROGRAM_ID, false, false),
+    );
+  }
+  return {
+    programId: params.programId,
+    accounts,
+    data: encodeInstruction({
+      kind: "BuyName",
+      nameHash: hash,
     }),
   };
 }

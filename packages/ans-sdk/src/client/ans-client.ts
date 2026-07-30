@@ -4,10 +4,12 @@ import {
   type NameAvailability,
 } from "../availability.js";
 import {
+  decodeListingAccount,
   decodeNameAccount,
   decodeRecordAccount,
   decodeRegistryConfig,
   decodeReverseAccount,
+  LISTING_ACCOUNT_DISCRIMINATOR,
   NAME_ACCOUNT_DISCRIMINATOR,
   RECORD_ACCOUNT_DISCRIMINATOR,
   REGISTRY_CONFIG_DISCRIMINATOR,
@@ -20,6 +22,7 @@ import {
   registryConfigBytes,
 } from "../config/manifest.js";
 import {
+  deriveListingAddress,
   deriveNameAddress,
   deriveRecordAddressFor,
   deriveReverseAddress,
@@ -27,8 +30,11 @@ import {
 import { AnsError } from "../errors.js";
 import { bytesEqual, bytesToHex } from "../hex.js";
 import {
+  buildBuyNameInstruction,
+  buildCancelListingInstruction,
   buildClearPrimaryInstruction,
   buildDeleteRecordInstruction,
+  buildListNameInstruction,
   buildRegisterInstruction,
   buildSetPrimaryInstruction,
   buildSetRecordInstruction,
@@ -46,7 +52,9 @@ import type {
   AnsDeploymentManifest,
   ArchAddress,
   BuiltInstruction,
+  ListingAccount,
   NameAccount,
+  QuoteCurrency,
   RecordAccount,
   RecordType,
   RecordValue,
@@ -429,6 +437,108 @@ export class AnsClient {
       name,
       newOwner,
     });
+  }
+
+  buildListName(
+    seller: ArchAddress,
+    name: string,
+    currency: QuoteCurrency,
+    price: bigint,
+  ): BuiltInstruction {
+    return buildListNameInstruction({
+      programId: this.programId,
+      seller,
+      registryConfig: this.registryConfigAddress,
+      namespace: this.manifest.namespace,
+      name,
+      currency,
+      price,
+    });
+  }
+
+  buildCancelListing(seller: ArchAddress, name: string): BuiltInstruction {
+    return buildCancelListingInstruction({
+      programId: this.programId,
+      seller,
+      registryConfig: this.registryConfigAddress,
+      namespace: this.manifest.namespace,
+      name,
+    });
+  }
+
+  buildBuyName(
+    buyer: ArchAddress,
+    seller: ArchAddress,
+    name: string,
+    currency: QuoteCurrency,
+    tokenAccounts?: { buyerAta: ArchAddress; sellerAta: ArchAddress },
+  ): BuiltInstruction {
+    return buildBuyNameInstruction({
+      programId: this.programId,
+      buyer,
+      seller,
+      registryConfig: this.registryConfigAddress,
+      namespace: this.manifest.namespace,
+      name,
+      currency,
+      buyerAta: tokenAccounts?.buyerAta,
+      sellerAta: tokenAccounts?.sellerAta,
+    });
+  }
+
+  async fetchListing(name: string): Promise<ListingAccount | null> {
+    const hash = nameHash(canonicalizeName(name));
+    const address = deriveListingAddress(
+      this.programId,
+      this.manifest.namespace,
+      hash,
+    );
+    const info = await this.transport.readAccountInfo(address);
+    if (!info || info.data.length === 0) return null;
+    try {
+      const listing = decodeListingAccount(info.data);
+      validateHeader(listing.header, LISTING_ACCOUNT_DISCRIMINATOR);
+      if (!listing.active) return null;
+      return listing;
+    } catch {
+      return null;
+    }
+  }
+
+  async listActiveListings(): Promise<
+    Array<{ name: string; listing: ListingAccount }>
+  > {
+    if (!this.transport.getProgramAccounts) {
+      throw new AnsError("CodecError", "transport does not support getProgramAccounts");
+    }
+    const entries = await this.transport.getProgramAccounts(this.programId, [
+      { DataContent: { offset: 0, bytes: Array.from(LISTING_ACCOUNT_DISCRIMINATOR) } },
+    ]);
+    const out: Array<{ name: string; listing: ListingAccount }> = [];
+    const names = await this.listNameAccounts();
+    const byHash = new Map(
+      names.map((entry) => [bytesToHex(entry.account.nameHash), entry.name] as const),
+    );
+    for (const entry of entries) {
+      if (!bytesEqual(entry.account.owner, this.programId)) continue;
+      try {
+        const listing = decodeListingAccount(entry.account.data);
+        validateHeader(listing.header, LISTING_ACCOUNT_DISCRIMINATOR);
+        if (!listing.active) continue;
+        const expected = deriveListingAddress(
+          this.programId,
+          this.manifest.namespace,
+          listing.nameHash,
+        );
+        if (!bytesEqual(expected, entry.pubkey)) continue;
+        const name = byHash.get(bytesToHex(listing.nameHash));
+        if (!name) continue;
+        out.push({ name, listing });
+      } catch {
+        // skip
+      }
+    }
+    return out;
   }
 
   buildSetRecord(
