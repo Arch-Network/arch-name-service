@@ -18,7 +18,8 @@ describe("domain-profile helpers", () => {
   });
 
   it("formats quote amounts and sorts offers", () => {
-    expect(formatQuoteAmount(1000n, "Arch")).toBe("1000 ARCH");
+    expect(formatQuoteAmount(1_500_000_000n, "Arch")).toBe("1.5 ARCH");
+    expect(formatQuoteAmount(100_000n, "Btc")).toBe("0.001 aBTC");
     expect(
       sortOffersByPriceDesc([
         { price: 1n },

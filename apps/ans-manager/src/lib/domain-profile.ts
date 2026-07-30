@@ -2,6 +2,8 @@
  * Domain profile tab helpers (SNS-style Details / Offers / Activity).
  */
 
+import { formatQuoteBaseUnits, quoteSymbol } from "./quote-amount";
+
 export type DomainProfileTab = "details" | "offers" | "activity";
 
 export function parseDomainProfileTab(
@@ -15,8 +17,7 @@ export function formatQuoteAmount(
   price: bigint,
   currency: "Arch" | "Btc",
 ): string {
-  const unit = currency === "Btc" ? "aBTC" : "ARCH";
-  return `${price.toString()} ${unit}`;
+  return `${formatQuoteBaseUnits(price, currency)} ${quoteSymbol(currency)}`;
 }
 
 export function labelLengthCategory(canonicalName: string): string {

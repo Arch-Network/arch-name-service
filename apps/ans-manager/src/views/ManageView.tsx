@@ -6,6 +6,7 @@ import {
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ExplorerLink } from "../components/ExplorerLink";
 import { ProfileRecords } from "../components/ProfileRecords";
+import { QuoteAmountSelector } from "../components/QuoteAmountSelector";
 import { ResolutionSummary } from "../components/ResolutionSummary";
 import { StatusNotice } from "../components/StatusNotice";
 import { WalletRecoveryActions } from "../components/WalletRecoveryActions";
@@ -42,6 +43,8 @@ import {
   loadNameProfile,
   type LoadedProfile,
 } from "../lib/name-profile";
+import { formatQuoteAmount } from "../lib/domain-profile";
+import { parseQuoteAmount } from "../lib/quote-amount";
 import {
   buildProfileRows,
   groupProfileRows,
@@ -523,7 +526,7 @@ export function ManageView() {
         <div className="card manage-section">
           <h2 className="section-heading">List for sale</h2>
           <p className="section-copy">
-            Fixed-price listing in ARCH lamports or aBTC (Arch Bitcoin). An active listing blocks
+            Fixed-price listing in ARCH or aBTC (Arch Bitcoin). An active listing blocks
             transfers until you cancel or someone buys.
           </p>
           {activeListing ? (
@@ -531,7 +534,7 @@ export function ManageView() {
               <StatusNotice
                 tone="info"
                 title="Listed"
-                message={`${activeListing.price.toString()} ${activeListing.currency === "Btc" ? "aBTC sats" : "ARCH lamports"}`}
+                message={formatQuoteAmount(activeListing.price, activeListing.currency)}
               />
               <button
                 className="btn btn-secondary"
@@ -555,42 +558,24 @@ export function ManageView() {
             </>
           ) : (
             <>
-              <div className="manage-list-row">
-                <div>
-                  <label className="input-label" htmlFor="list-price">
-                    Price
-                  </label>
-                  <input
-                    id="list-price"
-                    className="input mono"
-                    inputMode="numeric"
-                    placeholder="1000"
-                    value={listPrice}
-                    onChange={(e) => setListPrice(e.target.value.replace(/[^\d]/g, ""))}
-                  />
-                </div>
-                <div>
-                  <label className="input-label" htmlFor="list-currency">
-                    Currency
-                  </label>
-                  <select
-                    id="list-currency"
-                    className="input"
-                    value={listCurrency}
-                    onChange={(e) => setListCurrency(e.target.value as "Arch" | "Btc")}
-                  >
-                    <option value="Arch">ARCH (lamports)</option>
-                    <option value="Btc">BTC (aBTC sats)</option>
-                  </select>
-                </div>
-              </div>
+              <QuoteAmountSelector
+                amount={listPrice}
+                currency={listCurrency}
+                label="Listing price"
+                onAmountChange={setListPrice}
+                onCurrencyChange={setListCurrency}
+              />
               <button
                 className="btn btn-primary"
                 disabled={
-                  busy || !ready || !canonicalName || !listPrice || BigInt(listPrice || "0") === 0n
+                  busy ||
+                  !ready ||
+                  !canonicalName ||
+                  (parseQuoteAmount(listPrice, listCurrency) ?? 0n) <= 0n
                 }
                 onClick={() => {
-                  const price = BigInt(listPrice);
+                  const price = parseQuoteAmount(listPrice, listCurrency);
+                  if (price === null || price <= 0n) return;
                   void run(
                     MANAGE_ACTIONS.list,
                     (archAddress) =>

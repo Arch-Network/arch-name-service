@@ -13,6 +13,7 @@ import {
 } from "@arch-network/ans-sdk";
 import { CopyValue } from "../components/CopyValue";
 import { ExplorerLink } from "../components/ExplorerLink";
+import { QuoteAmountSelector } from "../components/QuoteAmountSelector";
 import { ReadOnlyRecordGroups } from "../components/ReadOnlyRecordGroups";
 import { StatusNotice } from "../components/StatusNotice";
 import { useArchWallet } from "../hooks/useArchWallet";
@@ -41,6 +42,8 @@ import {
   registerPathForLabel,
 } from "../lib/register-handoff";
 import { nameOwnedBy } from "../lib/confirm-effects";
+import { formatQuoteBaseUnits, parseQuoteAmount, quoteSymbol } from "../lib/quote-amount";
+import { fetchQuoteBalance, type QuoteBalance } from "../lib/quote-balance";
 import { walletStatusCta } from "../lib/wallet-status";
 
 type ExtraRecord = { id: string; label: string; value: string };
@@ -104,8 +107,12 @@ export function ViewNameView() {
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionTxid, setActionTxid] = useState<string | null>(null);
+  /** Which action produced `actionTxid` / `actionError`, so feedback renders beside its button. */
+  const [actionKind, setActionKind] = useState<string | null>(null);
   const [offerPrice, setOfferPrice] = useState("");
   const [offerCurrency, setOfferCurrency] = useState<QuoteCurrency>("Arch");
+  const [balance, setBalance] = useState<QuoteBalance | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const canonicalName = useMemo(() => {
@@ -184,6 +191,29 @@ export function ViewNameView() {
     };
   }, [canonicalName, tab, refreshKey]);
 
+  useEffect(() => {
+    const owner = account?.archAddress;
+    if (!owner) {
+      setBalance(null);
+      return;
+    }
+    let cancelled = false;
+    setBalanceLoading(true);
+    void fetchQuoteBalance(owner, offerCurrency)
+      .then((next) => {
+        if (!cancelled) setBalance(next);
+      })
+      .catch(() => {
+        if (!cancelled) setBalance(null);
+      })
+      .finally(() => {
+        if (!cancelled) setBalanceLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [account?.archAddress, offerCurrency, refreshKey]);
+
   const extras = useMemo(
     () => (profile ? extrasFromProfile(profile) : []),
     [profile],
@@ -200,6 +230,11 @@ export function ViewNameView() {
     !!canonicalName && !loading && !profile && !!error?.includes("not registered");
   const cta = walletStatusCta(status);
   const topOffer = offers[0] ?? null;
+  const offerBaseUnits = parseQuoteAmount(offerPrice, offerCurrency);
+  const offerExceedsBalance =
+    !!balance && offerBaseUnits !== null && offerBaseUnits > balance.spendable;
+  const offerAmountValid =
+    offerBaseUnits !== null && offerBaseUnits > 0n && !offerExceedsBalance;
   const canBuy =
     !!listing &&
     !!profile?.ownerDisplay &&
@@ -219,6 +254,7 @@ export function ViewNameView() {
     run: (actor: string) => Promise<{ txid: string }>,
   ) {
     setBusy(action);
+    setActionKind(action);
     setActionError(null);
     setActionTxid(null);
     try {
@@ -276,9 +312,17 @@ export function ViewNameView() {
 
   async function onMakeOffer() {
     if (!canonicalName) return;
-    const price = BigInt(offerPrice.trim() || "0");
-    if (price <= 0n) {
-      setActionError("Enter a positive offer amount.");
+    const price = parseQuoteAmount(offerPrice, offerCurrency);
+    if (price === null || price <= 0n) {
+      setActionKind(MANAGE_ACTIONS.makeOffer);
+      setActionError(`Enter a valid positive ${quoteSymbol(offerCurrency)} amount.`);
+      return;
+    }
+    if (balance && price > balance.spendable) {
+      setActionKind(MANAGE_ACTIONS.makeOffer);
+      setActionError(
+        `Not enough ${quoteSymbol(offerCurrency)}. You can offer up to ${formatQuoteBaseUnits(balance.spendable, offerCurrency)} ${quoteSymbol(offerCurrency)}.`,
+      );
       return;
     }
     await withWalletActor(MANAGE_ACTIONS.makeOffer, async (actor) =>
@@ -493,31 +537,16 @@ export function ViewNameView() {
                     {!ownedByViewer ? (
                       <div className="domain-profile-offer-form">
                         <h3 className="section-heading">Make an offer</h3>
-                        <div className="manage-list-row">
-                          <label className="field">
-                            <span className="field-label">Amount</span>
-                            <input
-                              className="input mono"
-                              inputMode="numeric"
-                              placeholder="lamports or aBTC units"
-                              value={offerPrice}
-                              onChange={(e) => setOfferPrice(e.target.value)}
-                            />
-                          </label>
-                          <label className="field">
-                            <span className="field-label">Currency</span>
-                            <select
-                              className="input"
-                              value={offerCurrency}
-                              onChange={(e) =>
-                                setOfferCurrency(e.target.value as QuoteCurrency)
-                              }
-                            >
-                              <option value="Arch">ARCH (escrowed)</option>
-                              <option value="Btc">aBTC (buyer co-signs accept)</option>
-                            </select>
-                          </label>
-                        </div>
+                        <QuoteAmountSelector
+                          amount={offerPrice}
+                          currency={offerCurrency}
+                          label="Offer amount"
+                          balance={balance}
+                          balanceLoading={balanceLoading}
+                          walletConnected={!!account?.archAddress}
+                          onAmountChange={setOfferPrice}
+                          onCurrencyChange={setOfferCurrency}
+                        />
                         {cta ? (
                           <button
                             className="btn btn-primary"
@@ -530,12 +559,31 @@ export function ViewNameView() {
                           <button
                             className="btn btn-primary"
                             type="button"
-                            disabled={!!busy}
+                            disabled={!!busy || !offerAmountValid}
                             onClick={() => void onMakeOffer()}
                           >
-                            {busy === MANAGE_ACTIONS.makeOffer ? "Submitting…" : "Make offer"}
+                            {busy === MANAGE_ACTIONS.makeOffer
+                              ? "Submitting…"
+                              : offerExceedsBalance
+                                ? `Insufficient ${quoteSymbol(offerCurrency)}`
+                                : "Make offer"}
                           </button>
                         )}
+                        {actionKind === MANAGE_ACTIONS.makeOffer && actionTxid ? (
+                          <StatusNotice
+                            tone="success"
+                            title="Offer submitted"
+                            message="Your offer appears once the transaction confirms."
+                            detail={actionTxid}
+                          />
+                        ) : null}
+                        {actionKind === MANAGE_ACTIONS.makeOffer && actionError ? (
+                          <StatusNotice
+                            tone="error"
+                            title="Offer failed"
+                            message={actionError}
+                          />
+                        ) : null}
                       </div>
                     ) : null}
 
@@ -660,7 +708,7 @@ export function ViewNameView() {
                   </div>
                 </div>
 
-                {actionTxid ? (
+                {actionKind !== MANAGE_ACTIONS.makeOffer && actionTxid ? (
                   <StatusNotice
                     tone="success"
                     title="Submitted"
@@ -668,7 +716,7 @@ export function ViewNameView() {
                     detail={actionTxid}
                   />
                 ) : null}
-                {actionError ? (
+                {actionKind !== MANAGE_ACTIONS.makeOffer && actionError ? (
                   <StatusNotice tone="error" title="Action failed" message={actionError} />
                 ) : null}
 

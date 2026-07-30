@@ -548,6 +548,94 @@ a.btn {
   padding: 0;
   list-style: none;
 }
+.quote-amount-selector {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-field);
+  border-radius: var(--radius-field);
+  background: var(--surface-subtle);
+}
+.quote-amount-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.quote-amount-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.quote-amount-muted { color: var(--text-muted); }
+.quote-amount-max {
+  appearance: none;
+  border: 1px solid var(--color-primary-border);
+  border-radius: var(--radius-chip);
+  padding: 2px 8px;
+  background: var(--color-primary-tint);
+  color: var(--color-primary-hover);
+  font: 700 11px var(--font-sans);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.quote-amount-max:hover { background: var(--surface-card); }
+.quote-currency-toggle {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-input);
+  background: var(--surface-input);
+}
+.quote-currency-option {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-input) - 3px);
+  padding: 9px var(--space-3);
+  background: transparent;
+  color: var(--text-secondary);
+  font: 700 13px var(--font-sans);
+  cursor: pointer;
+}
+.quote-currency-option-active {
+  border-color: var(--border-card);
+  background: var(--surface-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-input);
+}
+.quote-amount-input-wrap {
+  position: relative;
+  display: block;
+}
+.quote-amount-input {
+  padding-right: 72px;
+  font-size: 20px;
+  font-weight: 700;
+}
+.quote-amount-symbol {
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  font: 700 13px var(--font-mono);
+  pointer-events: none;
+}
+.quote-amount-help,
+.quote-amount-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.quote-amount-error { color: var(--color-negative); }
+.quote-amount-note {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-divider);
+}
 .domain-profile-offer-row,
 .domain-profile-activity-row {
   display: flex;
