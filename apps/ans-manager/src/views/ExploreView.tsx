@@ -4,12 +4,13 @@ import bs58 from "bs58";
 import { StatusNotice } from "../components/StatusNotice";
 import { ansClient } from "../lib/ans";
 import { shortArchAddress } from "../lib/arch-identity";
-import { formatQuoteAmount } from "../lib/domain-profile";
+import { formatQuoteBaseUnits, quoteSymbol } from "../lib/quote-amount";
 import {
   MARKETPLACE_COLLECTIONS,
   collectionStats,
   explorePathForCollection,
   filterMarketplaceEntries,
+  lengthBadge,
   listedCount,
   parseCollectionId,
   sortMarketplaceEntries,
@@ -31,7 +32,7 @@ export function ExploreView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<MarketplaceSort>("name-asc");
+  const [sort, setSort] = useState<MarketplaceSort>("price-asc");
   const [listedOnly, setListedOnly] = useState(true);
 
   useEffect(() => {
@@ -67,10 +68,6 @@ export function ExploreView() {
       cancelled = true;
     };
   }, []);
-
-  const activeCollection =
-    MARKETPLACE_COLLECTIONS.find((c) => c.id === collectionId) ??
-    MARKETPLACE_COLLECTIONS[0];
 
   const globalStats = useMemo(() => {
     const owners = new Set(entries.map((e) => e.ownerDisplay)).size;
@@ -112,14 +109,19 @@ export function ExploreView() {
     setSearchParams({ collection: id }, { replace: true });
   }
 
+  const resultLabel = loading
+    ? "Loading…"
+    : listedOnly
+      ? `${visible.length.toLocaleString()} for sale`
+      : `${visible.length.toLocaleString()} registered`;
+
   return (
     <section className="page-section page-section-wide explore-page">
       <div className="hero explore-hero">
         <p className="eyebrow">Marketplace</p>
         <h1 className="page-title hero-title">Explore .arch names</h1>
         <p className="page-subtitle hero-copy">
-          Browse names listed by their owners. Fixed-price purchases settle on-chain with ownership
-          transfer.
+          Fixed-price listings settle on-chain with ownership transfer.
         </p>
       </div>
 
@@ -135,10 +137,6 @@ export function ExploreView() {
           <span className="explore-stat-value mono">
             {loading ? "…" : globalStats.owners.toLocaleString()}
           </span>
-        </div>
-        <div className="explore-stat">
-          <span className="explore-stat-label">Collections</span>
-          <span className="explore-stat-value mono">{globalStats.collections}</span>
         </div>
         <div className="explore-stat">
           <span className="explore-stat-label">Listed</span>
@@ -160,13 +158,17 @@ export function ExploreView() {
       <div className="explore-collections" aria-label="Name collections">
         {collectionFilters.map(({ collection, stats, listed }) => {
           const selected = collection.id === collectionId;
+          const count = listedOnly ? listed : stats.registered;
+          const empty = !loading && count === 0 && collection.id !== "all";
           return (
             <button
               key={collection.id}
               type="button"
-              className={`explore-collection-filter${selected ? " is-selected" : ""}`}
+              className={`explore-collection-filter${selected ? " is-selected" : ""}${empty ? " is-empty" : ""}`}
               onClick={() => selectCollection(collection.id)}
               aria-pressed={selected}
+              aria-disabled={empty}
+              disabled={empty}
             >
               <span className="explore-collection-title">{collection.title}</span>
               <span className="explore-collection-count mono">
@@ -182,50 +184,49 @@ export function ExploreView() {
       </div>
 
       <div className="explore-browse">
-        <div className="explore-browse-header">
-          <div>
-            <h2 className="card-title">{activeCollection.title}</h2>
-            <p className="explore-browse-sub">
-              {loading
-                ? "Loading names…"
-                : `${visible.length.toLocaleString()} ${listedOnly ? "active listings" : "registered names"}`}
-            </p>
-          </div>
-          <div className="explore-browse-controls">
-            <label className="explore-control">
-              <span className="input-label">Search</span>
-              <input
-                className="input mono"
-                placeholder="Filter by name or owner"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                autoComplete="off"
-              />
-            </label>
-            <label className="explore-control explore-control-sort">
-              <span className="input-label">Sort</span>
-              <select
-                className="input"
-                value={sort}
-                onChange={(e) => setSort(e.target.value as MarketplaceSort)}
+        <div className="explore-toolbar">
+          <p className="explore-toolbar-count">{resultLabel}</p>
+          <div className="explore-toolbar-controls">
+            <input
+              className="input explore-toolbar-search"
+              placeholder="Search names or owners"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoComplete="off"
+              aria-label="Search names or owners"
+            />
+            <select
+              className="input explore-toolbar-sort"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as MarketplaceSort)}
+              aria-label="Sort listings"
+            >
+              <option value="price-asc">Price · low to high</option>
+              <option value="price-desc">Price · high to low</option>
+              <option value="recent">Recently registered</option>
+              <option value="name-asc">Name A → Z</option>
+              <option value="name-desc">Name Z → A</option>
+              <option value="length-asc">Shortest first</option>
+              <option value="length-desc">Longest first</option>
+            </select>
+            <div className="explore-segmented" role="group" aria-label="Availability">
+              <button
+                type="button"
+                className={listedOnly ? "is-active" : undefined}
+                aria-pressed={listedOnly}
+                onClick={() => setListedOnly(true)}
               >
-                <option value="name-asc">Name A → Z</option>
-                <option value="name-desc">Name Z → A</option>
-                <option value="length-asc">Shortest first</option>
-                <option value="length-desc">Longest first</option>
-              </select>
-            </label>
-            <label className="explore-control explore-control-sort">
-              <span className="input-label">Filter</span>
-              <select
-                className="input"
-                value={listedOnly ? "listed" : "all"}
-                onChange={(e) => setListedOnly(e.target.value === "listed")}
+                For sale
+              </button>
+              <button
+                type="button"
+                className={!listedOnly ? "is-active" : undefined}
+                aria-pressed={!listedOnly}
+                onClick={() => setListedOnly(false)}
               >
-                <option value="listed">For sale</option>
-                <option value="all">All registered</option>
-              </select>
-            </label>
+                All
+              </button>
+            </div>
           </div>
         </div>
 
@@ -233,11 +234,24 @@ export function ExploreView() {
           <p className="explore-empty">Scanning on-chain name accounts…</p>
         ) : visible.length === 0 ? (
           <p className="explore-empty">
-            No names in this collection yet.
+            {listedOnly
+              ? "No names for sale in this collection."
+              : "No names in this collection yet."}
             {collectionId !== "all" ? (
               <>
                 {" "}
-                <Link to={explorePathForCollection("all")}>View all names</Link>
+                <Link to={explorePathForCollection("all")}>View all</Link>
+              </>
+            ) : listedOnly ? (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  className="linkish"
+                  onClick={() => setListedOnly(false)}
+                >
+                  Browse all registered
+                </button>
               </>
             ) : null}
           </p>
@@ -245,41 +259,48 @@ export function ExploreView() {
           <>
             <div className="explore-list-head" aria-hidden="true">
               <span>Name</span>
+              <span>Length</span>
               <span>Owner</span>
-              <span>Status</span>
-              <span>Price</span>
+              <span className="explore-col-price">Price</span>
               <span />
             </div>
             <ul className="explore-list">
-              {visible.map((entry) => (
-                <li key={entry.name}>
-                  <Link className="explore-name-row" to={viewPathForName(entry.name)}>
-                    <span className="explore-name-identity">
-                      <span className="explore-name-avatar" aria-hidden="true">
-                        {entry.name.slice(0, 2).toUpperCase()}
-                      </span>
+              {visible.map((entry) => {
+                const href = viewPathForName(entry.name);
+                return (
+                  <li key={entry.name}>
+                    <Link className="explore-name-row" to={href}>
                       <span className="explore-name-label mono">{entry.name}</span>
-                    </span>
-                    <span className="explore-name-owner mono" title={entry.ownerDisplay}>
-                      {shortArchAddress(entry.ownerDisplay)}
-                    </span>
-                    {entry.listing ? (
-                      <span className="explore-listing-status">For sale</span>
-                    ) : (
-                      <span className="explore-unlisted-status">Registered</span>
-                    )}
-                    {entry.listing ? (
-                      <span className="explore-name-price mono">
-                        {formatQuoteAmount(entry.listing.price, entry.listing.currency)}
+                      <span className="explore-length-badge">{lengthBadge(entry.name)}</span>
+                      <span className="explore-name-owner mono" title={entry.ownerDisplay}>
+                        {shortArchAddress(entry.ownerDisplay)}
                       </span>
-                    ) : (
-                      <span className="explore-name-meta">—</span>
-                    )}
-                    <span className="explore-row-action" aria-hidden="true">→</span>
-                  </Link>
-                </li>
-              ))}
+                      {entry.listing ? (
+                        <span className="explore-name-price">
+                          <span className="explore-price-amount mono">
+                            {formatQuoteBaseUnits(entry.listing.price, entry.listing.currency)}
+                          </span>
+                          <span className="explore-price-unit">
+                            {quoteSymbol(entry.listing.currency)}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="explore-name-meta explore-col-price">—</span>
+                      )}
+                      <span className="explore-row-action">
+                        {entry.listing ? "Buy" : "View"}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
+            {listedOnly && visible.length > 0 ? (
+              <p className="explore-footnote">
+                Mixed ARCH / aBTC prices sort by displayed amount until a reference rate is
+                available. Open a name to buy or make an offer.
+              </p>
+            ) : null}
           </>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { labelFromCanonical } from "./register-handoff";
+import { QUOTE_DECIMALS } from "./quote-amount";
 
 export type MarketplaceEntry = {
   name: string;
@@ -26,7 +27,14 @@ export type MarketplaceCollection = {
   capacity: number | null;
 };
 
-export type MarketplaceSort = "name-asc" | "name-desc" | "length-asc" | "length-desc";
+export type MarketplaceSort =
+  | "price-asc"
+  | "price-desc"
+  | "name-asc"
+  | "name-desc"
+  | "length-asc"
+  | "length-desc"
+  | "recent";
 
 export const MARKETPLACE_COLLECTIONS: MarketplaceCollection[] = [
   {
@@ -91,6 +99,23 @@ export function labelLength(name: string): number {
   }
 }
 
+export function lengthBadge(name: string): string {
+  const len = labelLength(name);
+  return len >= 5 ? "5+" : `${len}`;
+}
+
+/**
+ * Sort key from the human-readable amount (display units × 1e8).
+ * Mixed ARCH/aBTC ranks by magnitude until a real FX oracle exists.
+ */
+export function listingPriceSortKey(
+  listing: NonNullable<MarketplaceEntry["listing"]>,
+): bigint {
+  const decimals = QUOTE_DECIMALS[listing.currency];
+  const scale = 10n ** BigInt(decimals);
+  return (listing.price * 100_000_000n) / scale;
+}
+
 export function entryMatchesCollection(
   entry: MarketplaceEntry,
   collectionId: CollectionId,
@@ -147,6 +172,10 @@ export function filterMarketplaceEntries(
   });
 }
 
+function compareBigint(a: bigint, b: bigint): number {
+  return a === b ? 0 : a < b ? -1 : 1;
+}
+
 export function sortMarketplaceEntries(
   entries: ReadonlyArray<MarketplaceEntry>,
   sort: MarketplaceSort,
@@ -154,6 +183,17 @@ export function sortMarketplaceEntries(
   const next = [...entries];
   next.sort((a, b) => {
     switch (sort) {
+      case "price-asc":
+      case "price-desc": {
+        const aKey = a.listing ? listingPriceSortKey(a.listing) : null;
+        const bKey = b.listing ? listingPriceSortKey(b.listing) : null;
+        if (aKey === null && bKey === null) return a.name.localeCompare(b.name);
+        if (aKey === null) return 1;
+        if (bKey === null) return -1;
+        const d = compareBigint(aKey, bKey);
+        if (d !== 0) return sort === "price-asc" ? d : -d;
+        return a.name.localeCompare(b.name);
+      }
       case "name-desc":
         return a.name > b.name ? -1 : a.name < b.name ? 1 : 0;
       case "length-asc": {
@@ -162,6 +202,10 @@ export function sortMarketplaceEntries(
       }
       case "length-desc": {
         const d = labelLength(b.name) - labelLength(a.name);
+        return d !== 0 ? d : a.name.localeCompare(b.name);
+      }
+      case "recent": {
+        const d = compareBigint(b.registeredAtSlot, a.registeredAtSlot);
         return d !== 0 ? d : a.name.localeCompare(b.name);
       }
       case "name-asc":
