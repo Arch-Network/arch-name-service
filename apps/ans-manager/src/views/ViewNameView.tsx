@@ -88,7 +88,10 @@ function formatActivityTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
+  return d.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 export function ViewNameView() {
@@ -658,6 +661,10 @@ export function ViewNameView() {
                       <ul className="domain-profile-activity-list">
                         {activity.map((row) => (
                           <li key={row.txid} className="domain-profile-activity-row">
+                            <span
+                              className="domain-profile-activity-marker"
+                              aria-hidden="true"
+                            />
                             <div className="domain-profile-activity-event">
                               <span className="domain-profile-activity-title">
                                 {row.action?.title ?? "Transaction"}
@@ -674,18 +681,19 @@ export function ViewNameView() {
                               ) : null}
                             </div>
                             <div className="domain-profile-activity-meta">
-                              <span className="view-name-status">
+                              <time className="domain-profile-activity-time">
                                 {formatActivityTime(row.createdAt)}
-                                {row.blockHeight != null
-                                  ? ` · block ${row.blockHeight}`
-                                  : ""}
-                              </span>
-                              <ExplorerLink
-                                kind="tx"
-                                value={row.txid}
-                                truncate={{ head: 6, tail: 6 }}
-                                className="mono"
-                              />
+                              </time>
+                              <div className="domain-profile-activity-links">
+                                {row.blockHeight != null ? (
+                                  <span>
+                                    Block {row.blockHeight.toLocaleString()}
+                                  </span>
+                                ) : null}
+                                <ExplorerLink kind="tx" value={row.txid}>
+                                  View transaction ↗
+                                </ExplorerLink>
+                              </div>
                             </div>
                           </li>
                         ))}
