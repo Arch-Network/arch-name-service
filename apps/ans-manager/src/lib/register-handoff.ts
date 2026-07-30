@@ -34,3 +34,31 @@ export function registerPathForLabel(labelOrCanonical: string): string {
   if (!parsed) return "/register";
   return `/register?label=${encodeURIComponent(parsed)}`;
 }
+
+/** Build the read-only View route for a registered name. */
+export function viewPathForName(labelOrCanonical: string): string {
+  const trimmed = labelOrCanonical.trim().toLowerCase();
+  if (!trimmed) return "/";
+  try {
+    const canonical = canonicalizeName(
+      trimmed.endsWith(ARCH_SUFFIX) ? trimmed : `${trimmed}${ARCH_SUFFIX}`,
+    );
+    return `/view?name=${encodeURIComponent(canonical)}`;
+  } catch {
+    return "/";
+  }
+}
+
+/** Build the Manage route for a name the connected wallet owns. */
+export function managePathForName(labelOrCanonical: string): string {
+  const trimmed = labelOrCanonical.trim().toLowerCase();
+  if (!trimmed) return "/manage";
+  try {
+    const canonical = canonicalizeName(
+      trimmed.endsWith(ARCH_SUFFIX) ? trimmed : `${trimmed}${ARCH_SUFFIX}`,
+    );
+    return `/manage?name=${encodeURIComponent(canonical)}`;
+  } catch {
+    return "/manage";
+  }
+}

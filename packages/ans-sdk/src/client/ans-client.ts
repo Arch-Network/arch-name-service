@@ -60,6 +60,25 @@ export interface NameAvailabilityResult {
   account: NameAccount | null;
 }
 
+/** Newest `registeredAtSlot` first; when slots tie (common on testnet
+ * while the program still stamps `0`), newer-looking labels last→first. */
+export function selectRecentNames(
+  entries: ReadonlyArray<{ name: string; account: NameAccount }>,
+  limit: number,
+): Array<{ name: string; account: NameAccount }> {
+  const capped = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 0;
+  return [...entries]
+    .sort((a, b) => {
+      if (a.account.registeredAtSlot === b.account.registeredAtSlot) {
+        // Descending name: reverse of A→Z so the list reads newest-side first
+        // when every account still has registeredAtSlot = 0.
+        return a.name > b.name ? -1 : a.name < b.name ? 1 : 0;
+      }
+      return a.account.registeredAtSlot > b.account.registeredAtSlot ? -1 : 1;
+    })
+    .slice(0, capped);
+}
+
 export class AnsClient {
   readonly programId: ArchAddress;
   readonly registryConfigAddress: ArchAddress;
@@ -342,20 +361,23 @@ export class AnsClient {
     }
   }
 
-  async listOwnedNames(owner: ArchAddress): Promise<Array<{ name: string; account: NameAccount }>> {
+  /**
+   * Every initialized name PDA owned by this program, after PDA/discriminator
+   * checks. Shared by ownership and "recent registrations" scans.
+   */
+  async listNameAccounts(): Promise<Array<{ name: string; account: NameAccount }>> {
     if (!this.transport.getProgramAccounts) {
       throw new AnsError("CodecError", "transport does not support getProgramAccounts");
     }
     const entries = await this.transport.getProgramAccounts(this.programId, [
       { DataContent: { offset: 0, bytes: Array.from(NAME_ACCOUNT_DISCRIMINATOR) } },
     ]);
-    const owned: Array<{ name: string; account: NameAccount }> = [];
+    const names: Array<{ name: string; account: NameAccount }> = [];
     for (const entry of entries) {
       if (!bytesEqual(entry.account.owner, this.programId)) continue;
       try {
         const account = decodeNameAccount(entry.account.data);
         validateHeader(account.header, NAME_ACCOUNT_DISCRIMINATOR);
-        if (!bytesEqual(account.owner, owner)) continue;
         const name = canonicalizeName(`${account.canonicalLabel}.arch`);
         const expected = deriveNameAddress(
           this.programId,
@@ -363,12 +385,29 @@ export class AnsClient {
           account.nameHash,
         );
         if (!bytesEqual(expected, entry.pubkey)) continue;
-        owned.push({ name, account });
+        names.push({ name, account });
       } catch {
         // Skip non-name or invalid accounts.
       }
     }
-    return owned;
+    return names;
+  }
+
+  async listOwnedNames(owner: ArchAddress): Promise<Array<{ name: string; account: NameAccount }>> {
+    const names = await this.listNameAccounts();
+    return names.filter((entry) => bytesEqual(entry.account.owner, owner));
+  }
+
+  /**
+   * Newest registrations first, by on-chain `registeredAtSlot`.
+   *
+   * Fine for a small testnet front page. Full GPA from the browser will not
+   * stay cheap forever — swap this for an indexer feed when the set grows.
+   */
+  async listRecentNames(
+    limit = 12,
+  ): Promise<Array<{ name: string; account: NameAccount }>> {
+    return selectRecentNames(await this.listNameAccounts(), limit);
   }
 
   buildRegister(owner: ArchAddress, label: string): BuiltInstruction {

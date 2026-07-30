@@ -3,7 +3,7 @@ import {
   canonicalizeName,
   parseTaprootAddress,
 } from "@arch-network/ans-sdk";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ExplorerLink } from "../components/ExplorerLink";
 import { ProfileRecords } from "../components/ProfileRecords";
 import { ResolutionSummary } from "../components/ResolutionSummary";
@@ -48,6 +48,7 @@ import {
   validateDraft,
   type ProfileRecordRow,
 } from "../lib/records";
+import { viewPathForName } from "../lib/register-handoff";
 import {
   classifyWalletBlocker,
   walletBlockerNotice,
@@ -61,6 +62,7 @@ import {
 
 export function ManageView() {
   const { status, account, refresh, connectEpoch } = useArchWallet();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nameParam = searchParams.get("name");
   const [name, setName] = useState(nameParam ?? "");
@@ -178,6 +180,21 @@ export function ManageView() {
       cancelled = true;
     };
   }, [canonicalName, account?.archAddress, txid]);
+
+  // Connected non-owners should use the read-only view page.
+  useEffect(() => {
+    if (!canonicalName || profileLoading || !profile?.ownerDisplay) return;
+    const viewer = account?.archAddress;
+    if (!viewer) return;
+    if (archAddressesEqual(profile.ownerDisplay, viewer)) return;
+    navigate(viewPathForName(canonicalName), { replace: true });
+  }, [
+    account?.archAddress,
+    canonicalName,
+    navigate,
+    profile,
+    profileLoading,
+  ]);
 
   const rows = useMemo(() => {
     if (!profile || !canonicalName) return [];
