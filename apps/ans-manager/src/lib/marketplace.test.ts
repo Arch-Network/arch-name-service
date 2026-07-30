@@ -4,6 +4,8 @@ import {
   entryMatchesCollection,
   filterMarketplaceEntries,
   labelLength,
+  lengthBadge,
+  listingPriceSortKey,
   parseCollectionId,
   sortMarketplaceEntries,
   uniqueOwnerCount,
@@ -28,6 +30,8 @@ describe("marketplace helpers", () => {
   it("measures label length from canonical names", () => {
     expect(labelLength("alice.arch")).toBe(5);
     expect(labelLength("ab.arch")).toBe(2);
+    expect(lengthBadge("alice.arch")).toBe("5+");
+    expect(lengthBadge("abcd.arch")).toBe("4");
   });
 
   it("filters by collection length buckets", () => {
@@ -64,5 +68,40 @@ describe("marketplace helpers", () => {
     expect(
       sortMarketplaceEntries(filtered, "length-desc").map((e) => e.name),
     ).toEqual(["abcd.arch", "abc.arch", "ab.arch"]);
+  });
+
+  it("sorts listed prices by human magnitude", () => {
+    const priced: MarketplaceEntry[] = [
+      {
+        name: "cheap.arch",
+        ownerDisplay: "a",
+        registeredAtSlot: 1n,
+        listing: { currency: "Arch", price: 2_500_000_000n },
+      },
+      {
+        name: "mid.arch",
+        ownerDisplay: "b",
+        registeredAtSlot: 2n,
+        listing: { currency: "Btc", price: 3_500_000_000n },
+      },
+      {
+        name: "free.arch",
+        ownerDisplay: "c",
+        registeredAtSlot: 3n,
+        listing: null,
+      },
+    ];
+    expect(listingPriceSortKey(priced[0]!.listing!)).toBe(250_000_000n);
+    expect(listingPriceSortKey(priced[1]!.listing!)).toBe(3_500_000_000n);
+    expect(sortMarketplaceEntries(priced, "price-asc").map((e) => e.name)).toEqual([
+      "cheap.arch",
+      "mid.arch",
+      "free.arch",
+    ]);
+    expect(sortMarketplaceEntries(priced, "price-desc").map((e) => e.name)).toEqual([
+      "mid.arch",
+      "cheap.arch",
+      "free.arch",
+    ]);
   });
 });
