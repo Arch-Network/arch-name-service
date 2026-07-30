@@ -8,6 +8,8 @@ export type MarketplaceEntry = {
   listing?: {
     currency: "Arch" | "Btc";
     price: bigint;
+    /** Slot when the active listing was created; used for "newest listings". */
+    listedAtSlot?: bigint;
   } | null;
 };
 
@@ -30,6 +32,7 @@ export type MarketplaceCollection = {
 export type MarketplaceSort =
   | "price-asc"
   | "price-desc"
+  | "listed-recent"
   | "name-asc"
   | "name-desc"
   | "length-asc"
@@ -194,6 +197,15 @@ export function sortMarketplaceEntries(
         if (d !== 0) return sort === "price-asc" ? d : -d;
         return a.name.localeCompare(b.name);
       }
+      case "listed-recent": {
+        const aSlot = a.listing?.listedAtSlot ?? null;
+        const bSlot = b.listing?.listedAtSlot ?? null;
+        if (aSlot === null && bSlot === null) return a.name.localeCompare(b.name);
+        if (aSlot === null) return 1;
+        if (bSlot === null) return -1;
+        const d = compareBigint(bSlot, aSlot);
+        return d !== 0 ? d : a.name.localeCompare(b.name);
+      }
       case "name-desc":
         return a.name > b.name ? -1 : a.name < b.name ? 1 : 0;
       case "length-asc": {
@@ -218,6 +230,65 @@ export function sortMarketplaceEntries(
 
 export function listedCount(entries: ReadonlyArray<MarketplaceEntry>): number {
   return entries.filter((e) => !!e.listing).length;
+}
+
+export function listedEntries(
+  entries: ReadonlyArray<MarketplaceEntry>,
+): MarketplaceEntry[] {
+  return entries.filter((e) => !!e.listing);
+}
+
+/** Lowest active ask per quote currency. Mixed books stay separate until FX exists. */
+export function marketplaceFloors(
+  entries: ReadonlyArray<MarketplaceEntry>,
+): Partial<Record<"Arch" | "Btc", MarketplaceEntry>> {
+  const floors: Partial<Record<"Arch" | "Btc", MarketplaceEntry>> = {};
+  for (const entry of listedEntries(entries)) {
+    const listing = entry.listing!;
+    const current = floors[listing.currency];
+    if (!current || listing.price < current.listing!.price) {
+      floors[listing.currency] = entry;
+    }
+  }
+  return floors;
+}
+
+export function topListingsByPrice(
+  entries: ReadonlyArray<MarketplaceEntry>,
+  direction: "asc" | "desc",
+  limit = 3,
+): MarketplaceEntry[] {
+  return sortMarketplaceEntries(listedEntries(entries), direction === "asc" ? "price-asc" : "price-desc").slice(
+    0,
+    Math.max(0, limit),
+  );
+}
+
+export function newestListings(
+  entries: ReadonlyArray<MarketplaceEntry>,
+  limit = 3,
+): MarketplaceEntry[] {
+  return sortMarketplaceEntries(listedEntries(entries), "listed-recent").slice(
+    0,
+    Math.max(0, limit),
+  );
+}
+
+/** Per-length-bucket floor when that collection has at least one active listing. */
+export function collectionFloors(
+  entries: ReadonlyArray<MarketplaceEntry>,
+): Array<{ collectionId: CollectionId; entry: MarketplaceEntry }> {
+  const out: Array<{ collectionId: CollectionId; entry: MarketplaceEntry }> = [];
+  for (const collection of MARKETPLACE_COLLECTIONS) {
+    if (collection.id === "all") continue;
+    const cheapest = topListingsByPrice(
+      entries.filter((e) => entryMatchesCollection(e, collection.id)),
+      "asc",
+      1,
+    )[0];
+    if (cheapest) out.push({ collectionId: collection.id, entry: cheapest });
+  }
+  return out;
 }
 
 export function explorePathForCollection(collectionId: CollectionId = "all"): string {
