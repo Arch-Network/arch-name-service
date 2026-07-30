@@ -7,13 +7,17 @@ import { shortArchAddress } from "../lib/arch-identity";
 import { formatQuoteBaseUnits, quoteSymbol } from "../lib/quote-amount";
 import {
   MARKETPLACE_COLLECTIONS,
+  collectionFloors,
   collectionStats,
   explorePathForCollection,
   filterMarketplaceEntries,
   lengthBadge,
   listedCount,
+  marketplaceFloors,
+  newestListings,
   parseCollectionId,
   sortMarketplaceEntries,
+  topListingsByPrice,
   type CollectionId,
   type MarketplaceEntry,
   type MarketplaceSort,
@@ -23,6 +27,42 @@ import { viewPathForName } from "../lib/register-handoff";
 function formatCapacity(registered: number, capacity: number | null): string {
   if (capacity == null) return String(registered);
   return `${registered.toLocaleString()} / ${capacity.toLocaleString()}`;
+}
+
+function formatListingPrice(entry: MarketplaceEntry): string {
+  const listing = entry.listing;
+  if (!listing) return "—";
+  return `${formatQuoteBaseUnits(listing.price, listing.currency)} ${quoteSymbol(listing.currency)}`;
+}
+
+function PulseColumn({
+  title,
+  empty,
+  rows,
+}: {
+  title: string;
+  empty: string;
+  rows: MarketplaceEntry[];
+}) {
+  return (
+    <div className="explore-pulse-col">
+      <p className="explore-pulse-heading">{title}</p>
+      {rows.length === 0 ? (
+        <p className="explore-pulse-empty">{empty}</p>
+      ) : (
+        <ul className="explore-pulse-list">
+          {rows.map((entry) => (
+            <li key={`${title}-${entry.name}`}>
+              <Link className="explore-pulse-row" to={viewPathForName(entry.name)}>
+                <span className="explore-pulse-name mono">{entry.name}</span>
+                <span className="explore-pulse-price mono">{formatListingPrice(entry)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export function ExploreView() {
@@ -45,7 +85,11 @@ export function ExploreView() {
         const byName = new Map(
           listings.map((row) => [
             row.name,
-            { currency: row.listing.currency, price: row.listing.price },
+            {
+              currency: row.listing.currency,
+              price: row.listing.price,
+              listedAtSlot: row.listing.createdAtSlot,
+            },
           ]),
         );
         setEntries(
@@ -74,10 +118,20 @@ export function ExploreView() {
     return {
       registered: entries.length,
       owners,
-      collections: MARKETPLACE_COLLECTIONS.filter((c) => c.id !== "all").length,
       listed: listedCount(entries),
+      floors: marketplaceFloors(entries),
     };
   }, [entries]);
+
+  const pulse = useMemo(
+    () => ({
+      lowest: topListingsByPrice(entries, "asc", 3),
+      highest: topListingsByPrice(entries, "desc", 3),
+      newest: newestListings(entries, 3),
+      collectionFloors: collectionFloors(entries),
+    }),
+    [entries],
+  );
 
   const collectionFilters = useMemo(
     () =>
@@ -115,6 +169,9 @@ export function ExploreView() {
       ? `${visible.length.toLocaleString()} for sale`
       : `${visible.length.toLocaleString()} registered`;
 
+  const floorArch = globalStats.floors.Arch;
+  const floorBtc = globalStats.floors.Btc;
+
   return (
     <section className="page-section page-section-wide explore-page">
       <div className="hero explore-hero">
@@ -144,6 +201,19 @@ export function ExploreView() {
             {loading ? "…" : globalStats.listed.toLocaleString()}
           </span>
         </div>
+        <div className="explore-stat">
+          <span className="explore-stat-label">Floor</span>
+          <span className="explore-stat-value mono explore-stat-floor">
+            {loading
+              ? "…"
+              : !floorArch && !floorBtc
+                ? "—"
+                : [floorArch, floorBtc]
+                    .filter(Boolean)
+                    .map((entry) => formatListingPrice(entry!))
+                    .join(" · ")}
+          </span>
+        </div>
       </div>
 
       {error ? (
@@ -153,6 +223,52 @@ export function ExploreView() {
           message="The name index is temporarily unavailable. Try again in a moment."
           detail={error}
         />
+      ) : null}
+
+      {!loading && globalStats.listed > 0 ? (
+        <section className="explore-pulse" aria-label="Marketplace highlights">
+          <div className="explore-pulse-grid">
+            <PulseColumn
+              title="Lowest asks"
+              empty="No listings yet."
+              rows={pulse.lowest}
+            />
+            <PulseColumn
+              title="Highest asks"
+              empty="No listings yet."
+              rows={pulse.highest}
+            />
+            <PulseColumn
+              title="Newest listings"
+              empty="No listings yet."
+              rows={pulse.newest}
+            />
+          </div>
+          {pulse.collectionFloors.length > 0 ? (
+            <div className="explore-collection-floors" aria-label="Collection floors">
+              {pulse.collectionFloors.map(({ collectionId: id, entry }) => {
+                const title =
+                  MARKETPLACE_COLLECTIONS.find((c) => c.id === id)?.title ?? id;
+                return (
+                  <Link
+                    key={id}
+                    className="explore-collection-floor"
+                    to={explorePathForCollection(id)}
+                  >
+                    <span className="explore-collection-floor-label">{title} floor</span>
+                    <span className="explore-collection-floor-price mono">
+                      {formatListingPrice(entry)}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          ) : null}
+          <p className="explore-pulse-note">
+            Live asks from active on-chain listings. Completed sales will appear here once
+            names start trading.
+          </p>
+        </section>
       ) : null}
 
       <div className="explore-collections" aria-label="Name collections">
@@ -203,6 +319,7 @@ export function ExploreView() {
             >
               <option value="price-asc">Price · low to high</option>
               <option value="price-desc">Price · high to low</option>
+              <option value="listed-recent">Newest listings</option>
               <option value="recent">Recently registered</option>
               <option value="name-asc">Name A → Z</option>
               <option value="name-desc">Name Z → A</option>
