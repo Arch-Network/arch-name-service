@@ -78,6 +78,17 @@ export interface ListingAccount {
   active: boolean;
 }
 
+/** Buyer offer against a registered name. ARCH escrows lamports in the offer PDA. */
+export interface OfferAccount {
+  header: AccountHeader;
+  nameHash: Uint8Array;
+  buyer: ArchAddress;
+  currency: QuoteCurrency;
+  price: bigint;
+  createdAtSlot: bigint;
+  active: boolean;
+}
+
 export interface AccountAt<T> {
   address: ArchAddress;
   state: T;

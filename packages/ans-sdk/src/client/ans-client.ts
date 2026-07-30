@@ -6,11 +6,13 @@ import {
 import {
   decodeListingAccount,
   decodeNameAccount,
+  decodeOfferAccount,
   decodeRecordAccount,
   decodeRegistryConfig,
   decodeReverseAccount,
   LISTING_ACCOUNT_DISCRIMINATOR,
   NAME_ACCOUNT_DISCRIMINATOR,
+  OFFER_ACCOUNT_DISCRIMINATOR,
   RECORD_ACCOUNT_DISCRIMINATOR,
   REGISTRY_CONFIG_DISCRIMINATOR,
   REVERSE_ACCOUNT_DISCRIMINATOR,
@@ -24,17 +26,21 @@ import {
 import {
   deriveListingAddress,
   deriveNameAddress,
+  deriveOfferAddress,
   deriveRecordAddressFor,
   deriveReverseAddress,
 } from "../derive.js";
 import { AnsError } from "../errors.js";
 import { bytesEqual, bytesToHex } from "../hex.js";
 import {
+  buildAcceptOfferInstruction,
   buildBuyNameInstruction,
   buildCancelListingInstruction,
+  buildCancelOfferInstruction,
   buildClearPrimaryInstruction,
   buildDeleteRecordInstruction,
   buildListNameInstruction,
+  buildMakeOfferInstruction,
   buildRegisterInstruction,
   buildSetPrimaryInstruction,
   buildSetRecordInstruction,
@@ -54,6 +60,7 @@ import type {
   BuiltInstruction,
   ListingAccount,
   NameAccount,
+  OfferAccount,
   QuoteCurrency,
   RecordAccount,
   RecordType,
@@ -486,6 +493,53 @@ export class AnsClient {
     });
   }
 
+  buildMakeOffer(
+    buyer: ArchAddress,
+    name: string,
+    currency: QuoteCurrency,
+    price: bigint,
+  ): BuiltInstruction {
+    return buildMakeOfferInstruction({
+      programId: this.programId,
+      buyer,
+      registryConfig: this.registryConfigAddress,
+      namespace: this.manifest.namespace,
+      name,
+      currency,
+      price,
+    });
+  }
+
+  buildCancelOffer(buyer: ArchAddress, name: string): BuiltInstruction {
+    return buildCancelOfferInstruction({
+      programId: this.programId,
+      buyer,
+      registryConfig: this.registryConfigAddress,
+      namespace: this.manifest.namespace,
+      name,
+    });
+  }
+
+  buildAcceptOffer(
+    seller: ArchAddress,
+    buyer: ArchAddress,
+    name: string,
+    currency: QuoteCurrency,
+    tokenAccounts?: { buyerAta: ArchAddress; sellerAta: ArchAddress },
+  ): BuiltInstruction {
+    return buildAcceptOfferInstruction({
+      programId: this.programId,
+      seller,
+      buyer,
+      registryConfig: this.registryConfigAddress,
+      namespace: this.manifest.namespace,
+      name,
+      currency,
+      buyerAta: tokenAccounts?.buyerAta,
+      sellerAta: tokenAccounts?.sellerAta,
+    });
+  }
+
   async fetchListing(name: string): Promise<ListingAccount | null> {
     const hash = nameHash(canonicalizeName(name));
     const address = deriveListingAddress(
@@ -503,6 +557,58 @@ export class AnsClient {
     } catch {
       return null;
     }
+  }
+
+  async fetchOffer(name: string, buyer: ArchAddress): Promise<OfferAccount | null> {
+    const hash = nameHash(canonicalizeName(name));
+    const address = deriveOfferAddress(
+      this.programId,
+      this.manifest.namespace,
+      hash,
+      buyer,
+    );
+    const info = await this.transport.readAccountInfo(address);
+    if (!info || info.data.length === 0) return null;
+    try {
+      const offer = decodeOfferAccount(info.data);
+      validateHeader(offer.header, OFFER_ACCOUNT_DISCRIMINATOR);
+      if (!offer.active) return null;
+      return offer;
+    } catch {
+      return null;
+    }
+  }
+
+  async listOffersForName(name: string): Promise<OfferAccount[]> {
+    if (!this.transport.getProgramAccounts) {
+      throw new AnsError("CodecError", "transport does not support getProgramAccounts");
+    }
+    const hash = nameHash(canonicalizeName(name));
+    const entries = await this.transport.getProgramAccounts(this.programId, [
+      { DataContent: { offset: 0, bytes: Array.from(OFFER_ACCOUNT_DISCRIMINATOR) } },
+      { DataContent: { offset: 11, bytes: Array.from(hash) } },
+    ]);
+    const out: OfferAccount[] = [];
+    for (const entry of entries) {
+      if (!bytesEqual(entry.account.owner, this.programId)) continue;
+      try {
+        const offer = decodeOfferAccount(entry.account.data);
+        validateHeader(offer.header, OFFER_ACCOUNT_DISCRIMINATOR);
+        if (!offer.active) continue;
+        if (!bytesEqual(offer.nameHash, hash)) continue;
+        const expected = deriveOfferAddress(
+          this.programId,
+          this.manifest.namespace,
+          hash,
+          offer.buyer,
+        );
+        if (!bytesEqual(expected, entry.pubkey)) continue;
+        out.push(offer);
+      } catch {
+        // skip
+      }
+    }
+    return out;
   }
 
   async listActiveListings(): Promise<

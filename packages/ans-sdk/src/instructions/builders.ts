@@ -7,6 +7,7 @@ import {
 import {
   deriveListingAddress,
   deriveNameAddress,
+  deriveOfferAddress,
   deriveRecordAddressFor,
   deriveReverseAddress,
 } from "../derive.js";
@@ -169,6 +170,120 @@ export function buildBuyNameInstruction(params: {
     data: encodeInstruction({
       kind: "BuyName",
       nameHash: hash,
+    }),
+  };
+}
+
+export function buildMakeOfferInstruction(params: {
+  programId: ArchAddress;
+  buyer: ArchAddress;
+  registryConfig: ArchAddress;
+  namespace: string;
+  name: string;
+  currency: QuoteCurrency;
+  price: bigint;
+}): BuiltInstruction {
+  const hash = nameHash(params.name);
+  const nameAccount = deriveNameAddress(params.programId, params.namespace, hash);
+  const offerAccount = deriveOfferAddress(
+    params.programId,
+    params.namespace,
+    hash,
+    params.buyer,
+  );
+  return {
+    programId: params.programId,
+    accounts: [
+      meta(params.buyer, true, true),
+      meta(params.registryConfig, false, false),
+      meta(nameAccount, false, false),
+      meta(offerAccount, false, true),
+      meta(SYSTEM_PROGRAM_ID, false, false),
+    ],
+    data: encodeInstruction({
+      kind: "MakeOffer",
+      nameHash: hash,
+      currency: params.currency,
+      price: params.price,
+    }),
+  };
+}
+
+export function buildCancelOfferInstruction(params: {
+  programId: ArchAddress;
+  buyer: ArchAddress;
+  registryConfig: ArchAddress;
+  namespace: string;
+  name: string;
+}): BuiltInstruction {
+  const hash = nameHash(params.name);
+  const offerAccount = deriveOfferAddress(
+    params.programId,
+    params.namespace,
+    hash,
+    params.buyer,
+  );
+  return {
+    programId: params.programId,
+    accounts: [
+      meta(params.buyer, true, true),
+      meta(params.registryConfig, false, false),
+      meta(offerAccount, false, true),
+    ],
+    data: encodeInstruction({
+      kind: "CancelOffer",
+      nameHash: hash,
+    }),
+  };
+}
+
+export function buildAcceptOfferInstruction(params: {
+  programId: ArchAddress;
+  seller: ArchAddress;
+  buyer: ArchAddress;
+  registryConfig: ArchAddress;
+  namespace: string;
+  name: string;
+  currency: QuoteCurrency;
+  buyerAta?: ArchAddress;
+  sellerAta?: ArchAddress;
+}): BuiltInstruction {
+  const hash = nameHash(params.name);
+  const nameAccount = deriveNameAddress(params.programId, params.namespace, hash);
+  const offerAccount = deriveOfferAddress(
+    params.programId,
+    params.namespace,
+    hash,
+    params.buyer,
+  );
+  const listingAccount = deriveListingAddress(params.programId, params.namespace, hash);
+  const buyerIsSigner = params.currency === "Btc";
+  const accounts = [
+    meta(params.seller, true, true),
+    meta(params.buyer, buyerIsSigner, true),
+    meta(params.registryConfig, false, false),
+    meta(nameAccount, false, true),
+    meta(offerAccount, false, true),
+    meta(listingAccount, false, true),
+  ];
+  if (params.currency === "Btc") {
+    if (!params.buyerAta || !params.sellerAta) {
+      throw new Error("BTC offer accepts require buyer and seller aBTC ATAs");
+    }
+    accounts.push(
+      meta(params.buyerAta, false, true),
+      meta(params.sellerAta, false, true),
+      meta(TESTNET_ABTC_MINT, false, false),
+      meta(TOKEN_PROGRAM_ID, false, false),
+    );
+  }
+  return {
+    programId: params.programId,
+    accounts,
+    data: encodeInstruction({
+      kind: "AcceptOffer",
+      nameHash: hash,
+      buyer: params.buyer,
     }),
   };
 }

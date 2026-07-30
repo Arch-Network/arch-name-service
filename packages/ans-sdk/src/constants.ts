@@ -4,12 +4,14 @@ export const NAME_ACCOUNT_DISCRIMINATOR = new TextEncoder().encode("ANSNAME1");
 export const RECORD_ACCOUNT_DISCRIMINATOR = new TextEncoder().encode("ANSRECR1");
 export const REVERSE_ACCOUNT_DISCRIMINATOR = new TextEncoder().encode("ANSREVR1");
 export const LISTING_ACCOUNT_DISCRIMINATOR = new TextEncoder().encode("ANSLIST1");
+export const OFFER_ACCOUNT_DISCRIMINATOR = new TextEncoder().encode("ANSOFFR1");
 
 export const CONFIG_SEED = new TextEncoder().encode("ans:config:v1");
 export const NAME_SEED = new TextEncoder().encode("ans:name:v1");
 export const RECORD_SEED = new TextEncoder().encode("ans:record:v1");
 export const REVERSE_SEED = new TextEncoder().encode("ans:reverse:v1");
 export const LISTING_SEED = new TextEncoder().encode("ans:listing:v1");
+export const OFFER_SEED = new TextEncoder().encode("ans:offer:v1");
 export const NAMESPACE_DOMAIN = new TextEncoder().encode("arch-name-service:namespace:v1\0");
 export const NAME_HASH_DOMAIN = new TextEncoder().encode("arch-name-service:name-hash:v1\0");
 export const RECORD_KEY_DOMAIN = new TextEncoder().encode("arch-name-service:record-key:v1\0");
