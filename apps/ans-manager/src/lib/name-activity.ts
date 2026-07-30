@@ -2,7 +2,13 @@
  * Recent on-chain activity for a name PDA, via same-origin Explorer REST.
  */
 
-import { canonicalizeName, deriveNameAddress, nameHash } from "@arch-network/ans-sdk";
+import {
+  bytesToHex,
+  canonicalizeName,
+  deriveNameAddress,
+  nameHash,
+} from "@arch-network/ans-sdk";
+import { describeInstructionData, type ActivityAction } from "./activity-labels";
 import { decodeArchAddress, encodeArchAddress, getAnsClient } from "./ans";
 
 const EXPLORER_BASE = (import.meta.env.VITE_EXPLORER_URL ?? "/explorer").replace(
@@ -10,10 +16,17 @@ const EXPLORER_BASE = (import.meta.env.VITE_EXPLORER_URL ?? "/explorer").replace
   "",
 );
 
+/** How many rows get a follow-up detail fetch to resolve their action. */
+const ACTION_LOOKUP_LIMIT = 25;
+const ACTION_LOOKUP_CONCURRENCY = 6;
+
 export type NameActivityItem = {
   txid: string;
   createdAt: string | null;
   blockHeight: number | null;
+  /** Decoded ANS action, present once the transaction detail has been read. */
+  action?: ActivityAction | null;
+  failed?: boolean;
 };
 
 type ExplorerTxRow = {
@@ -84,9 +97,90 @@ export async function fetchNameActivity(
     .filter((row): row is NameActivityItem => row !== null);
 }
 
+type ExplorerInstruction = { program_id?: unknown; data?: unknown };
+
+type ExplorerTxDetail = {
+  status?: unknown;
+  data?: { message?: { instructions?: unknown } };
+};
+
+/** The Explorer reports failures as `{ Failed: reason }` and successes as a string. */
+function isFailedStatus(status: unknown): boolean {
+  if (typeof status === "string") return status.toLowerCase() === "failed";
+  return typeof status === "object" && status !== null && "Failed" in status;
+}
+
+function actionFromDetail(
+  detail: ExplorerTxDetail,
+  programIdHex: string,
+): ActivityAction | null {
+  const raw = detail.data?.message?.instructions;
+  const instructions = Array.isArray(raw) ? (raw as ExplorerInstruction[]) : [];
+  for (const ix of instructions) {
+    if (ix.program_id !== programIdHex || typeof ix.data !== "string") continue;
+    const action = describeInstructionData(ix.data);
+    if (action) return action;
+  }
+  return null;
+}
+
+/** Action and failure state for one txid; nulls out on any Explorer or decode gap. */
+async function fetchTxAction(
+  txid: string,
+  programIdHex: string,
+): Promise<Pick<NameActivityItem, "action" | "failed">> {
+  try {
+    const response = await fetch(
+      `${EXPLORER_BASE}/transactions/${encodeURIComponent(txid)}`,
+      { headers: { accept: "application/json" } },
+    );
+    if (!response.ok) return { action: null, failed: false };
+    const detail = (await response.json()) as ExplorerTxDetail;
+    return {
+      action: actionFromDetail(detail, programIdHex),
+      failed: isFailedStatus(detail.status),
+    };
+  } catch {
+    return { action: null, failed: false };
+  }
+}
+
+async function mapWithConcurrency<T, R>(
+  items: ReadonlyArray<T>,
+  concurrency: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+      while (cursor < items.length) {
+        const index = cursor++;
+        results[index] = await worker(items[index]!);
+      }
+    }),
+  );
+  return results;
+}
+
+/** Attach decoded ANS actions to the most recent rows. */
+export async function enrichNameActivity(
+  items: ReadonlyArray<NameActivityItem>,
+): Promise<NameActivityItem[]> {
+  const head = items.slice(0, ACTION_LOOKUP_LIMIT);
+  const programIdHex = bytesToHex(getAnsClient().programId);
+  const actions = await mapWithConcurrency(head, ACTION_LOOKUP_CONCURRENCY, (row) =>
+    fetchTxAction(row.txid, programIdHex),
+  );
+  return items.map((row, index) =>
+    index < actions.length ? { ...row, ...actions[index]! } : row,
+  );
+}
+
 export async function fetchActivityForName(
   canonicalName: string,
   limit = 50,
 ): Promise<NameActivityItem[]> {
-  return fetchNameActivity(nameAccountAddressFor(canonicalName), limit);
+  const rows = await fetchNameActivity(nameAccountAddressFor(canonicalName), limit);
+  return enrichNameActivity(rows);
 }
