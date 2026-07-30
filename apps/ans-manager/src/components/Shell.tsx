@@ -55,6 +55,7 @@ export function Shell() {
           </div>
           <nav className="nav" aria-label="ANS navigation">
             <NavLink to="/" end>Discover</NavLink>
+            <NavLink to="/explore">Marketplace</NavLink>
             <NavLink to="/manage">Manage</NavLink>
             <NavLink to="/names">My names</NavLink>
           </nav>

@@ -213,11 +213,18 @@ export function SearchView() {
             <p className="eyebrow">On-chain</p>
             <h2 className="card-title">Latest registrations</h2>
           </div>
-          {!recentLoading && !recentError ? (
-            <span className="count-badge">
-              {recent.length} {recent.length === 1 ? "name" : "names"}
-            </span>
-          ) : null}
+          <div className="recent-names-actions">
+            {!recentLoading && !recentError ? (
+              <span className="count-badge">
+                {recent.length} {recent.length === 1 ? "name" : "names"}
+              </span>
+            ) : null}
+            {!recentLoading && !recentError ? (
+              <Link className="btn btn-secondary btn-compact" to="/explore">
+                Browse marketplace
+              </Link>
+            ) : null}
+          </div>
         </div>
         {recentLoading ? (
           <p className="recent-names-status">Loading recent names…</p>

@@ -4,6 +4,7 @@ import { Shell } from "./components/Shell";
 import { AnsWalletPortBridge, WalletPicker } from "./components/WalletPicker";
 import { ArchWalletProvider, useArchWallet } from "./hooks/useArchWallet";
 import { ANS_WALLET_KIT_CONFIG } from "./lib/kit-config";
+import { ExploreView } from "./views/ExploreView";
 import { ManageView } from "./views/ManageView";
 import { MyNamesView } from "./views/MyNamesView";
 import { RegisterView } from "./views/RegisterView";
@@ -25,6 +26,7 @@ export default function App() {
           <Routes>
             <Route element={<Shell />}>
               <Route index element={<SearchView />} />
+              <Route path="explore" element={<ExploreView />} />
               <Route path="register" element={<RegisterView />} />
               <Route path="view" element={<ViewNameView />} />
               <Route path="manage" element={<ManageView />} />
