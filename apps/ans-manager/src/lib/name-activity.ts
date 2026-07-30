@@ -1,11 +1,14 @@
 /**
  * Recent on-chain activity for a name PDA, via same-origin Explorer REST.
+ *
+ * Uses `/accounts/{addr}/transactions/v2`, which includes instruction data and
+ * status so each row can be labeled without a follow-up detail fetch.
  */
 
 import {
-  bytesToHex,
   canonicalizeName,
   deriveNameAddress,
+  loadTestnetManifest,
   nameHash,
 } from "@arch-network/ans-sdk";
 import { describeInstructionData, type ActivityAction } from "./activity-labels";
@@ -16,18 +19,16 @@ const EXPLORER_BASE = (import.meta.env.VITE_EXPLORER_URL ?? "/explorer").replace
   "",
 );
 
-/** How many rows get a follow-up detail fetch to resolve their action. */
-const ACTION_LOOKUP_LIMIT = 25;
-const ACTION_LOOKUP_CONCURRENCY = 6;
-
 export type NameActivityItem = {
   txid: string;
   createdAt: string | null;
   blockHeight: number | null;
-  /** Decoded ANS action, present once the transaction detail has been read. */
+  /** Decoded ANS action from the v2 instruction payload. */
   action?: ActivityAction | null;
   failed?: boolean;
 };
+
+type ExplorerInstruction = { program_id?: unknown; data?: unknown };
 
 type ExplorerTxRow = {
   txid?: unknown;
@@ -35,9 +36,40 @@ type ExplorerTxRow = {
   createdAt?: unknown;
   block_height?: unknown;
   blockHeight?: unknown;
+  status?: unknown;
+  data?: { message?: { instructions?: unknown } };
 };
 
-function asActivityItem(row: ExplorerTxRow): NameActivityItem | null {
+/** The Explorer reports failures as `{ Failed: reason }` and successes as a string. */
+export function isFailedStatus(status: unknown): boolean {
+  if (typeof status === "string") return status.toLowerCase() === "failed";
+  return typeof status === "object" && status !== null && "Failed" in status;
+}
+
+export function actionFromExplorerRow(
+  row: ExplorerTxRow,
+  programIdHex: string,
+): ActivityAction | null {
+  const raw = row.data?.message?.instructions;
+  const instructions = Array.isArray(raw) ? (raw as ExplorerInstruction[]) : [];
+  for (const ix of instructions) {
+    if (
+      typeof ix.program_id !== "string" ||
+      ix.program_id.toLowerCase() !== programIdHex.toLowerCase() ||
+      typeof ix.data !== "string"
+    ) {
+      continue;
+    }
+    const action = describeInstructionData(ix.data);
+    if (action) return action;
+  }
+  return null;
+}
+
+function asActivityItem(
+  row: ExplorerTxRow,
+  programIdHex: string,
+): NameActivityItem | null {
   if (typeof row.txid !== "string" || !row.txid) return null;
   const createdAt =
     typeof row.created_at === "string"
@@ -52,7 +84,13 @@ function asActivityItem(row: ExplorerTxRow): NameActivityItem | null {
       : typeof blockHeightRaw === "string" && /^-?\d+$/.test(blockHeightRaw)
         ? Number(blockHeightRaw)
         : null;
-  return { txid: row.txid, createdAt, blockHeight };
+  return {
+    txid: row.txid,
+    createdAt,
+    blockHeight,
+    action: actionFromExplorerRow(row, programIdHex),
+    failed: isFailedStatus(row.status),
+  };
 }
 
 /** Normalize a name PDA address (base58 or 64-char hex) to base58 for Explorer. */
@@ -82,7 +120,9 @@ export async function fetchNameActivity(
   const address = normalizeNameAccountAddress(nameAccountBase58OrHex);
   if (!address) return [];
   const capped = Math.min(Math.max(1, Math.floor(limit)), 100);
-  const url = `${EXPLORER_BASE}/accounts/${encodeURIComponent(address)}/transactions?limit=${capped}`;
+  // Path is relative to /explorer (proxy already targets /api/v1/testnet).
+  // Do not prefix with "testnet/" — that fails the proxy allowlist.
+  const url = `${EXPLORER_BASE}/accounts/${encodeURIComponent(address)}/transactions/v2?limit=${capped}`;
   const response = await fetch(url, {
     headers: { accept: "application/json" },
   });
@@ -92,95 +132,16 @@ export async function fetchNameActivity(
   }
   const body = (await response.json()) as { transactions?: ExplorerTxRow[] };
   const rows = Array.isArray(body.transactions) ? body.transactions : [];
+  // Manifest programId is already hex — avoid constructing AnsClient just to label rows.
+  const programIdHex = loadTestnetManifest().programId.toLowerCase();
   return rows
-    .map(asActivityItem)
+    .map((row) => asActivityItem(row, programIdHex))
     .filter((row): row is NameActivityItem => row !== null);
-}
-
-type ExplorerInstruction = { program_id?: unknown; data?: unknown };
-
-type ExplorerTxDetail = {
-  status?: unknown;
-  data?: { message?: { instructions?: unknown } };
-};
-
-/** The Explorer reports failures as `{ Failed: reason }` and successes as a string. */
-function isFailedStatus(status: unknown): boolean {
-  if (typeof status === "string") return status.toLowerCase() === "failed";
-  return typeof status === "object" && status !== null && "Failed" in status;
-}
-
-function actionFromDetail(
-  detail: ExplorerTxDetail,
-  programIdHex: string,
-): ActivityAction | null {
-  const raw = detail.data?.message?.instructions;
-  const instructions = Array.isArray(raw) ? (raw as ExplorerInstruction[]) : [];
-  for (const ix of instructions) {
-    if (ix.program_id !== programIdHex || typeof ix.data !== "string") continue;
-    const action = describeInstructionData(ix.data);
-    if (action) return action;
-  }
-  return null;
-}
-
-/** Action and failure state for one txid; nulls out on any Explorer or decode gap. */
-async function fetchTxAction(
-  txid: string,
-  programIdHex: string,
-): Promise<Pick<NameActivityItem, "action" | "failed">> {
-  try {
-    const response = await fetch(
-      `${EXPLORER_BASE}/transactions/${encodeURIComponent(txid)}`,
-      { headers: { accept: "application/json" } },
-    );
-    if (!response.ok) return { action: null, failed: false };
-    const detail = (await response.json()) as ExplorerTxDetail;
-    return {
-      action: actionFromDetail(detail, programIdHex),
-      failed: isFailedStatus(detail.status),
-    };
-  } catch {
-    return { action: null, failed: false };
-  }
-}
-
-async function mapWithConcurrency<T, R>(
-  items: ReadonlyArray<T>,
-  concurrency: number,
-  worker: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let cursor = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-      while (cursor < items.length) {
-        const index = cursor++;
-        results[index] = await worker(items[index]!);
-      }
-    }),
-  );
-  return results;
-}
-
-/** Attach decoded ANS actions to the most recent rows. */
-export async function enrichNameActivity(
-  items: ReadonlyArray<NameActivityItem>,
-): Promise<NameActivityItem[]> {
-  const head = items.slice(0, ACTION_LOOKUP_LIMIT);
-  const programIdHex = bytesToHex(getAnsClient().programId);
-  const actions = await mapWithConcurrency(head, ACTION_LOOKUP_CONCURRENCY, (row) =>
-    fetchTxAction(row.txid, programIdHex),
-  );
-  return items.map((row, index) =>
-    index < actions.length ? { ...row, ...actions[index]! } : row,
-  );
 }
 
 export async function fetchActivityForName(
   canonicalName: string,
   limit = 50,
 ): Promise<NameActivityItem[]> {
-  const rows = await fetchNameActivity(nameAccountAddressFor(canonicalName), limit);
-  return enrichNameActivity(rows);
+  return fetchNameActivity(nameAccountAddressFor(canonicalName), limit);
 }
