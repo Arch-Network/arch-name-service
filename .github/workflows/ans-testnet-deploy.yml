@@ -60,7 +60,7 @@ jobs:
             echo "PROGRAM_KEY_PATH=$KEYS/program.json"
             echo "DEPLOYER_KEY_PATH=$KEYS/deployer.json"
             echo "NAMESPACE_AUTHORITY_KEY_PATH=$KEYS/namespace-authority.json"
-            echo "ARCH_RPC_URL=${CI_ARCH_RPC_URL:-https://id.arch.network/rpc}"
+            echo "ARCH_RPC_URL=${CI_ARCH_RPC_URL:-https://rpc.testnet.arch.network}"
           } >> "$GITHUB_ENV"
 
       - name: Build deploy tool
