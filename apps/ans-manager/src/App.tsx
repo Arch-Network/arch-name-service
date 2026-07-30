@@ -8,6 +8,7 @@ import { ManageView } from "./views/ManageView";
 import { MyNamesView } from "./views/MyNamesView";
 import { RegisterView } from "./views/RegisterView";
 import { SearchView } from "./views/SearchView";
+import { ViewNameView } from "./views/ViewNameView";
 
 function WalletPickerHost() {
   const { walletPickerOpen, closeWalletPicker } = useArchWallet();
@@ -25,6 +26,7 @@ export default function App() {
             <Route element={<Shell />}>
               <Route index element={<SearchView />} />
               <Route path="register" element={<RegisterView />} />
+              <Route path="view" element={<ViewNameView />} />
               <Route path="manage" element={<ManageView />} />
               <Route path="names" element={<MyNamesView />} />
               <Route path="*" element={<Navigate to="/" replace />} />

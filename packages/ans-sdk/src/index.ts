@@ -6,7 +6,7 @@ export {
   type ClassifiedNameAccount,
   type NameAvailability,
 } from "./availability.js";
-export { AnsClient, type NameAvailabilityResult } from "./client/ans-client.js";
+export { AnsClient, selectRecentNames, type NameAvailabilityResult } from "./client/ans-client.js";
 export {
   assertManifestConsistency,
   loadTestnetManifest,

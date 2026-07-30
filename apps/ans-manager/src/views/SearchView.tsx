@@ -1,17 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AnsError,
   TEXT_RECORD_CATALOG,
   canonicalizeName,
 } from "@arch-network/ans-sdk";
+import bs58 from "bs58";
 import { ExplorerLink } from "../components/ExplorerLink";
 import { ReadOnlyRecordGroups } from "../components/ReadOnlyRecordGroups";
 import { StatusNotice } from "../components/StatusNotice";
+import { ansClient } from "../lib/ans";
+import { shortArchAddress } from "../lib/arch-identity";
 import { loadNameProfile } from "../lib/name-profile";
-import { registerPathForLabel } from "../lib/register-handoff";
+import {
+  registerPathForLabel,
+  viewPathForName,
+} from "../lib/register-handoff";
 
 type ExtraRecord = { id: string; label: string; value: string };
+
+type RecentName = {
+  name: string;
+  ownerDisplay: string;
+};
+
+const RECENT_LIMIT = 12;
 
 export function SearchView() {
   const [query, setQuery] = useState("");
@@ -23,6 +36,36 @@ export function SearchView() {
   const [showMore, setShowMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [recent, setRecent] = useState<RecentName[]>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
+  const [recentError, setRecentError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setRecentLoading(true);
+    setRecentError(null);
+    void ansClient
+      .listRecentNames(RECENT_LIMIT)
+      .then((entries) => {
+        if (cancelled) return;
+        setRecent(
+          entries.map((entry) => ({
+            name: entry.name,
+            ownerDisplay: bs58.encode(entry.account.owner),
+          })),
+        );
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setRecentError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (!cancelled) setRecentLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onSearch(event: React.FormEvent) {
     event.preventDefault();
@@ -128,15 +171,15 @@ export function SearchView() {
                       <ReadOnlyRecordGroups records={extraRecords} />
                     ) : null}
                     {canonical ? (
-                      <Link className="btn btn-secondary btn-compact" to={`/manage?name=${canonical}`}>
-                        Manage {canonical}
+                      <Link className="btn btn-secondary btn-compact" to={viewPathForName(canonical)}>
+                        View {canonical}
                       </Link>
                     ) : null}
                   </div>
                 ) : canonical ? (
                   <div className="search-records">
-                    <Link className="btn btn-secondary btn-compact" to={`/manage?name=${canonical}`}>
-                      Manage {canonical}
+                    <Link className="btn btn-secondary btn-compact" to={viewPathForName(canonical)}>
+                      View {canonical}
                     </Link>
                   </div>
                 ) : null}
@@ -163,6 +206,41 @@ export function SearchView() {
           detail={error}
         />
       ) : null}
+
+      <div className="card recent-names" aria-live="polite">
+        <div className="recent-names-header">
+          <div>
+            <p className="eyebrow">On-chain</p>
+            <h2 className="card-title">Latest registrations</h2>
+          </div>
+          {!recentLoading && !recentError ? (
+            <span className="count-badge">
+              {recent.length} {recent.length === 1 ? "name" : "names"}
+            </span>
+          ) : null}
+        </div>
+        {recentLoading ? (
+          <p className="recent-names-status">Loading recent names…</p>
+        ) : recentError ? (
+          <p className="recent-names-status">Could not load recent names right now.</p>
+        ) : recent.length === 0 ? (
+          <p className="recent-names-status">No names registered yet. Be the first.</p>
+        ) : (
+          <ul className="recent-names-list">
+            {recent.map((entry) => (
+              <li key={entry.name} className="recent-name-row">
+                <Link className="recent-name-link mono" to={viewPathForName(entry.name)}>
+                  {entry.name}
+                </Link>
+                <span className="recent-name-owner mono" title={entry.ownerDisplay}>
+                  {shortArchAddress(entry.ownerDisplay)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="benefit-grid" aria-label="What you can do with an Arch name">
         <article className="benefit-card">
           <span className="benefit-number">01</span>
