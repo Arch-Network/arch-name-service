@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { bytesToHex } from "@arch-network/ans-sdk";
 import bs58 from "bs58";
 import { StatusNotice } from "../components/StatusNotice";
 import { ansClient } from "../lib/ans";
@@ -23,6 +24,10 @@ import {
   type MarketplaceSort,
 } from "../lib/marketplace";
 import { viewPathForName } from "../lib/register-handoff";
+import {
+  EMPTY_REGISTRY_TIMELINE,
+  fetchRegistryTimeline,
+} from "../lib/registry-activity";
 
 function formatCapacity(registered: number, capacity: number | null): string {
   if (capacity == null) return String(registered);
@@ -79,8 +84,14 @@ export function ExploreView() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void Promise.all([ansClient.listNameAccounts(), ansClient.listActiveListings()])
-      .then(([rows, listings]) => {
+    void Promise.all([
+      ansClient.listNameAccounts(),
+      ansClient.listActiveListings(),
+      // Recency lives in the Explorer, not on chain (see registry-activity).
+      // A missing feed only costs ordering, so it must not fail the page.
+      fetchRegistryTimeline().catch(() => EMPTY_REGISTRY_TIMELINE),
+    ])
+      .then(([rows, listings, timeline]) => {
         if (cancelled) return;
         const byName = new Map(
           listings.map((row) => [
@@ -89,6 +100,9 @@ export function ExploreView() {
               currency: row.listing.currency,
               price: row.listing.price,
               listedAtSlot: row.listing.createdAtSlot,
+              listedAt:
+                timeline.listedAtByNameHash.get(bytesToHex(row.listing.nameHash)) ??
+                null,
             },
           ]),
         );
@@ -97,6 +111,7 @@ export function ExploreView() {
             name: row.name,
             ownerDisplay: bs58.encode(row.account.owner),
             registeredAtSlot: row.account.registeredAtSlot,
+            registeredAt: timeline.registeredAtByName.get(row.name) ?? null,
             listing: byName.get(row.name) ?? null,
           })),
         );

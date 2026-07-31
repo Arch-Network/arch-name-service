@@ -1461,6 +1461,7 @@ a.btn {
 }
 .recent-name-row:last-child { border-bottom: 0; }
 .recent-name-link {
+  flex: 1 1 auto;
   min-width: 0;
   color: var(--text-primary);
   font: 500 14px var(--font-mono);
@@ -1468,6 +1469,12 @@ a.btn {
   overflow-wrap: anywhere;
 }
 .recent-name-link:hover { color: var(--color-primary); }
+.recent-name-age {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
 .recent-name-owner {
   flex: 0 0 auto;
   color: var(--text-muted);

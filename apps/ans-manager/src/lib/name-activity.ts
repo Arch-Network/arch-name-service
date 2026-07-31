@@ -13,11 +13,16 @@ import {
 } from "@arch-network/ans-sdk";
 import { describeInstructionData, type ActivityAction } from "./activity-labels";
 import { decodeArchAddress, encodeArchAddress, getAnsClient } from "./ans";
+import {
+  ansInstructionPayloads,
+  explorerBlockHeight,
+  explorerCreatedAt,
+  fetchTransactionRows,
+  isFailedStatus,
+  type ExplorerTxRow,
+} from "./explorer-tx";
 
-const EXPLORER_BASE = (import.meta.env.VITE_EXPLORER_URL ?? "/explorer").replace(
-  /\/+$/,
-  "",
-);
+export { isFailedStatus };
 
 export type NameActivityItem = {
   txid: string;
@@ -28,39 +33,12 @@ export type NameActivityItem = {
   failed?: boolean;
 };
 
-type ExplorerInstruction = { program_id?: unknown; data?: unknown };
-
-type ExplorerTxRow = {
-  txid?: unknown;
-  created_at?: unknown;
-  createdAt?: unknown;
-  block_height?: unknown;
-  blockHeight?: unknown;
-  status?: unknown;
-  data?: { message?: { instructions?: unknown } };
-};
-
-/** The Explorer reports failures as `{ Failed: reason }` and successes as a string. */
-export function isFailedStatus(status: unknown): boolean {
-  if (typeof status === "string") return status.toLowerCase() === "failed";
-  return typeof status === "object" && status !== null && "Failed" in status;
-}
-
 export function actionFromExplorerRow(
   row: ExplorerTxRow,
   programIdHex: string,
 ): ActivityAction | null {
-  const raw = row.data?.message?.instructions;
-  const instructions = Array.isArray(raw) ? (raw as ExplorerInstruction[]) : [];
-  for (const ix of instructions) {
-    if (
-      typeof ix.program_id !== "string" ||
-      ix.program_id.toLowerCase() !== programIdHex.toLowerCase() ||
-      typeof ix.data !== "string"
-    ) {
-      continue;
-    }
-    const action = describeInstructionData(ix.data);
+  for (const payload of ansInstructionPayloads(row, programIdHex)) {
+    const action = describeInstructionData(payload);
     if (action) return action;
   }
   return null;
@@ -71,23 +49,10 @@ function asActivityItem(
   programIdHex: string,
 ): NameActivityItem | null {
   if (typeof row.txid !== "string" || !row.txid) return null;
-  const createdAt =
-    typeof row.created_at === "string"
-      ? row.created_at
-      : typeof row.createdAt === "string"
-        ? row.createdAt
-        : null;
-  const blockHeightRaw = row.block_height ?? row.blockHeight;
-  const blockHeight =
-    typeof blockHeightRaw === "number" && Number.isFinite(blockHeightRaw)
-      ? blockHeightRaw
-      : typeof blockHeightRaw === "string" && /^-?\d+$/.test(blockHeightRaw)
-        ? Number(blockHeightRaw)
-        : null;
   return {
     txid: row.txid,
-    createdAt,
-    blockHeight,
+    createdAt: explorerCreatedAt(row),
+    blockHeight: explorerBlockHeight(row),
     action: actionFromExplorerRow(row, programIdHex),
     failed: isFailedStatus(row.status),
   };
@@ -119,19 +84,10 @@ export async function fetchNameActivity(
 ): Promise<NameActivityItem[]> {
   const address = normalizeNameAccountAddress(nameAccountBase58OrHex);
   if (!address) return [];
-  const capped = Math.min(Math.max(1, Math.floor(limit)), 100);
-  // Path is relative to /explorer (proxy already targets /api/v1/testnet).
-  // Do not prefix with "testnet/" — that fails the proxy allowlist.
-  const url = `${EXPLORER_BASE}/accounts/${encodeURIComponent(address)}/transactions/v2?limit=${capped}`;
-  const response = await fetch(url, {
-    headers: { accept: "application/json" },
+  const rows = await fetchTransactionRows(address, {
+    limit,
+    context: "name activity",
   });
-  if (response.status === 404) return [];
-  if (!response.ok) {
-    throw new Error(`Explorer name activity HTTP ${response.status}`);
-  }
-  const body = (await response.json()) as { transactions?: ExplorerTxRow[] };
-  const rows = Array.isArray(body.transactions) ? body.transactions : [];
   // Manifest programId is already hex — avoid constructing AnsClient just to label rows.
   const programIdHex = loadTestnetManifest().programId.toLowerCase();
   return rows
