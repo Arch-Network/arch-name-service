@@ -32,6 +32,8 @@ type RecentName = {
 };
 
 const RECENT_LIMIT = 12;
+/** An open tab should pick up new registrations without a reload. */
+const RECENT_REFRESH_MS = 30_000;
 
 const AGE_UNITS: Array<[label: string, ms: number]> = [
   ["d", 86_400_000],
@@ -66,17 +68,26 @@ export function SearchView() {
 
   useEffect(() => {
     let cancelled = false;
-    setRecentLoading(true);
-    setRecentError(null);
+    let first = true;
+
     // Order comes from the Explorer, not the accounts: the program stamps
     // `registered_at_slot: 0`, so on-chain ordering degenerates to a name
     // tie-break and new registrations never reach the top. A missing feed only
     // costs ordering, so it falls back to the on-chain list.
-    void Promise.all([
-      ansClient.listNameAccounts(),
-      fetchRegistryTimeline().catch(() => EMPTY_REGISTRY_TIMELINE),
-    ])
-      .then(([rows, timeline]) => {
+    async function load() {
+      const isFirst = first;
+      first = false;
+      // A background tab does not need a full program scan every interval.
+      if (!isFirst && document.hidden) return;
+      if (isFirst) {
+        setRecentLoading(true);
+        setRecentError(null);
+      }
+      try {
+        const [rows, timeline] = await Promise.all([
+          ansClient.listNameAccounts(),
+          fetchRegistryTimeline().catch(() => EMPTY_REGISTRY_TIMELINE),
+        ]);
         if (cancelled) return;
         const named = rows.map((entry) => ({
           name: entry.name,
@@ -86,16 +97,21 @@ export function SearchView() {
         setRecent(
           orderNamesByRegistration(named, timeline.registeredAtByName, RECENT_LIMIT),
         );
-      })
-      .catch((err) => {
-        if (cancelled) return;
+        setRecentError(null);
+      } catch (err) {
+        // A failed refresh must not replace a list already on screen.
+        if (cancelled || !isFirst) return;
         setRecentError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (!cancelled) setRecentLoading(false);
-      });
+      } finally {
+        if (!cancelled && isFirst) setRecentLoading(false);
+      }
+    }
+
+    void load();
+    const timer = window.setInterval(() => void load(), RECENT_REFRESH_MS);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
     };
   }, []);
 
