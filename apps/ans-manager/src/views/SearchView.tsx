@@ -41,6 +41,17 @@ const AGE_UNITS: Array<[label: string, ms: number]> = [
   ["m", 60_000],
 ];
 
+/**
+ * Count for the card badge. It used to show the number of rows, which capped at
+ * RECENT_LIMIT and read as the size of the whole registry.
+ */
+function formatRegisteredCount(shown: number, total: number | null): string {
+  if (total === null) return `${shown} ${shown === 1 ? "name" : "names"}`;
+  const label = total === 1 ? "name" : "names";
+  if (shown < total) return `${shown} of ${total.toLocaleString()} ${label}`;
+  return `${total.toLocaleString()} ${label}`;
+}
+
 /** Compact age, e.g. "3h ago". Empty when the registration time is unknown. */
 function formatAge(at: number | null): string {
   if (at === null) return "";
@@ -63,6 +74,8 @@ export function SearchView() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [recent, setRecent] = useState<RecentName[]>([]);
+  /** Every registered name, not just the rows shown. */
+  const [totalNames, setTotalNames] = useState<number | null>(null);
   const [recentLoading, setRecentLoading] = useState(true);
   const [recentError, setRecentError] = useState<string | null>(null);
 
@@ -97,6 +110,7 @@ export function SearchView() {
         setRecent(
           orderNamesByRegistration(named, timeline.registeredAtByName, RECENT_LIMIT),
         );
+        setTotalNames(rows.length);
         setRecentError(null);
       } catch (err) {
         // A failed refresh must not replace a list already on screen.
@@ -263,8 +277,15 @@ export function SearchView() {
           </div>
           <div className="recent-names-actions">
             {!recentLoading && !recentError ? (
-              <span className="count-badge">
-                {recent.length} {recent.length === 1 ? "name" : "names"}
+              <span
+                className="count-badge"
+                title={
+                  totalNames === null
+                    ? undefined
+                    : `${totalNames.toLocaleString()} .arch ${totalNames === 1 ? "name" : "names"} registered on testnet`
+                }
+              >
+                {formatRegisteredCount(recent.length, totalNames)}
               </span>
             ) : null}
             {!recentLoading && !recentError ? (
