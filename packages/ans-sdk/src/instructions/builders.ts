@@ -11,7 +11,7 @@ import {
   deriveRecordAddressFor,
   deriveReverseAddress,
 } from "../derive.js";
-import { nameHash } from "../name.js";
+import { canonicalizeLabel, nameHash } from "../name.js";
 import type {
   ArchAddress,
   BuiltInstruction,
@@ -32,7 +32,10 @@ export function buildRegisterInstruction(params: {
   label: string;
   durationSlots?: bigint;
 }): BuiltInstruction {
-  const hash = nameHash(`${params.label}.arch`);
+  // The encoded label must match the label the PDA was derived from, so both
+  // come from one canonicalization pass.
+  const label = canonicalizeLabel(params.label);
+  const hash = nameHash(`${label}.arch`);
   const nameAccount = deriveNameAddress(params.programId, params.namespace, hash);
   return {
     programId: params.programId,
@@ -44,7 +47,7 @@ export function buildRegisterInstruction(params: {
     ],
     data: encodeInstruction({
       kind: "Register",
-      label: params.label,
+      label,
       durationSlots: params.durationSlots ?? 0n,
     }),
   };
