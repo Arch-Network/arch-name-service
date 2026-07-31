@@ -69,7 +69,12 @@ export {
   buildSetRecordInstruction,
   buildTransferInstruction,
 } from "./instructions/builders.js";
-export { canonicalizeName, nameHash, validateLabel } from "./name.js";
+export {
+  canonicalizeLabel,
+  canonicalizeName,
+  nameHash,
+  validateLabel,
+} from "./name.js";
 export {
   TEXT_RECORD_CATALOG,
   manifestSupportsTextRecords,
