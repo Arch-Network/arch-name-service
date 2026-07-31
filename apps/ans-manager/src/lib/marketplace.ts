@@ -5,11 +5,19 @@ export type MarketplaceEntry = {
   name: string;
   ownerDisplay: string;
   registeredAtSlot: bigint;
+  /**
+   * Registration time (epoch ms) from the Explorer feed. The program stamps
+   * `registered_at_slot: 0`, so this is the only real recency signal; null
+   * means "outside the indexed window", not "oldest".
+   */
+  registeredAt?: number | null;
   listing?: {
     currency: "Arch" | "Btc";
     price: bigint;
     /** Slot when the active listing was created; used for "newest listings". */
     listedAtSlot?: bigint;
+    /** Listing time (epoch ms) from the Explorer feed; see `registeredAt`. */
+    listedAt?: number | null;
   } | null;
 };
 
@@ -179,6 +187,24 @@ function compareBigint(a: bigint, b: bigint): number {
   return a === b ? 0 : a < b ? -1 : 1;
 }
 
+/**
+ * Newest-first by epoch ms, with unknown timestamps sorted last.
+ *
+ * Returns 0 when neither side has a timestamp so the caller can fall through to
+ * its next key — an unindexed name must not outrank a dated one.
+ */
+function compareRecency(
+  a: number | null | undefined,
+  b: number | null | undefined,
+): number {
+  const aKnown = typeof a === "number" && Number.isFinite(a);
+  const bKnown = typeof b === "number" && Number.isFinite(b);
+  if (!aKnown && !bKnown) return 0;
+  if (!aKnown) return 1;
+  if (!bKnown) return -1;
+  return b! - a!;
+}
+
 export function sortMarketplaceEntries(
   entries: ReadonlyArray<MarketplaceEntry>,
   sort: MarketplaceSort,
@@ -198,6 +224,8 @@ export function sortMarketplaceEntries(
         return a.name.localeCompare(b.name);
       }
       case "listed-recent": {
+        const byTime = compareRecency(a.listing?.listedAt, b.listing?.listedAt);
+        if (byTime !== 0) return byTime;
         const aSlot = a.listing?.listedAtSlot ?? null;
         const bSlot = b.listing?.listedAtSlot ?? null;
         if (aSlot === null && bSlot === null) return a.name.localeCompare(b.name);
@@ -217,6 +245,8 @@ export function sortMarketplaceEntries(
         return d !== 0 ? d : a.name.localeCompare(b.name);
       }
       case "recent": {
+        const byTime = compareRecency(a.registeredAt, b.registeredAt);
+        if (byTime !== 0) return byTime;
         const d = compareBigint(b.registeredAtSlot, a.registeredAtSlot);
         return d !== 0 ? d : a.name.localeCompare(b.name);
       }

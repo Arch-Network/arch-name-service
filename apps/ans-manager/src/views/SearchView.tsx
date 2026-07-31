@@ -11,6 +11,11 @@ import { ReadOnlyRecordGroups } from "../components/ReadOnlyRecordGroups";
 import { StatusNotice } from "../components/StatusNotice";
 import { ansClient } from "../lib/ans";
 import { shortArchAddress } from "../lib/arch-identity";
+import {
+  EMPTY_REGISTRY_TIMELINE,
+  fetchRegistryTimeline,
+  orderNamesByRegistration,
+} from "../lib/registry-activity";
 import { loadNameProfile } from "../lib/name-profile";
 import {
   registerPathForLabel,
@@ -22,9 +27,28 @@ type ExtraRecord = { id: string; label: string; value: string };
 type RecentName = {
   name: string;
   ownerDisplay: string;
+  /** Epoch ms; null when outside the Explorer's indexed window. */
+  registeredAt: number | null;
 };
 
 const RECENT_LIMIT = 12;
+
+const AGE_UNITS: Array<[label: string, ms: number]> = [
+  ["d", 86_400_000],
+  ["h", 3_600_000],
+  ["m", 60_000],
+];
+
+/** Compact age, e.g. "3h ago". Empty when the registration time is unknown. */
+function formatAge(at: number | null): string {
+  if (at === null) return "";
+  const elapsed = Date.now() - at;
+  if (elapsed < 60_000) return "just now";
+  for (const [label, ms] of AGE_UNITS) {
+    if (elapsed >= ms) return `${Math.floor(elapsed / ms)}${label} ago`;
+  }
+  return "";
+}
 
 export function SearchView() {
   const [query, setQuery] = useState("");
@@ -44,15 +68,23 @@ export function SearchView() {
     let cancelled = false;
     setRecentLoading(true);
     setRecentError(null);
-    void ansClient
-      .listRecentNames(RECENT_LIMIT)
-      .then((entries) => {
+    // Order comes from the Explorer, not the accounts: the program stamps
+    // `registered_at_slot: 0`, so on-chain ordering degenerates to a name
+    // tie-break and new registrations never reach the top. A missing feed only
+    // costs ordering, so it falls back to the on-chain list.
+    void Promise.all([
+      ansClient.listNameAccounts(),
+      fetchRegistryTimeline().catch(() => EMPTY_REGISTRY_TIMELINE),
+    ])
+      .then(([rows, timeline]) => {
         if (cancelled) return;
+        const named = rows.map((entry) => ({
+          name: entry.name,
+          ownerDisplay: bs58.encode(entry.account.owner),
+          registeredAt: timeline.registeredAtByName.get(entry.name) ?? null,
+        }));
         setRecent(
-          entries.map((entry) => ({
-            name: entry.name,
-            ownerDisplay: bs58.encode(entry.account.owner),
-          })),
+          orderNamesByRegistration(named, timeline.registeredAtByName, RECENT_LIMIT),
         );
       })
       .catch((err) => {
@@ -239,6 +271,14 @@ export function SearchView() {
                 <Link className="recent-name-link mono" to={viewPathForName(entry.name)}>
                   {entry.name}
                 </Link>
+                {entry.registeredAt !== null ? (
+                  <time
+                    className="recent-name-age"
+                    dateTime={new Date(entry.registeredAt).toISOString()}
+                  >
+                    {formatAge(entry.registeredAt)}
+                  </time>
+                ) : null}
                 <span className="recent-name-owner mono" title={entry.ownerDisplay}>
                   {shortArchAddress(entry.ownerDisplay)}
                 </span>

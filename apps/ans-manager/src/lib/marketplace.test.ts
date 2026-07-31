@@ -149,4 +149,72 @@ describe("marketplace helpers", () => {
       "5-plus",
     ]);
   });
+
+  /**
+   * The program stamps every slot as 0, so Explorer timestamps are the only real
+   * recency signal and must outrank the slot.
+   */
+  it("prefers Explorer timestamps over the always-zero slots", () => {
+    const zeroSlots: MarketplaceEntry[] = [
+      { name: "tree.arch", ownerDisplay: "o", registeredAtSlot: 0n, registeredAt: null },
+      {
+        name: "matt.arch",
+        ownerDisplay: "o",
+        registeredAtSlot: 0n,
+        registeredAt: Date.parse("2026-07-30T10:42:26Z"),
+      },
+      {
+        name: "1504king.arch",
+        ownerDisplay: "o",
+        registeredAtSlot: 0n,
+        registeredAt: Date.parse("2026-07-31T11:51:25Z"),
+      },
+    ];
+
+    expect(sortMarketplaceEntries(zeroSlots, "recent").map((e) => e.name)).toEqual([
+      "1504king.arch",
+      "matt.arch",
+      // Undated names sort last rather than being treated as newest.
+      "tree.arch",
+    ]);
+  });
+
+  it("orders newest listings by listing timestamp when slots tie", () => {
+    const zeroSlots: MarketplaceEntry[] = [
+      {
+        name: "old.arch",
+        ownerDisplay: "o",
+        registeredAtSlot: 0n,
+        listing: {
+          currency: "Arch",
+          price: 1n,
+          listedAtSlot: 0n,
+          listedAt: Date.parse("2026-07-01T00:00:00Z"),
+        },
+      },
+      {
+        name: "new.arch",
+        ownerDisplay: "o",
+        registeredAtSlot: 0n,
+        listing: {
+          currency: "Arch",
+          price: 2n,
+          listedAtSlot: 0n,
+          listedAt: Date.parse("2026-07-31T00:00:00Z"),
+        },
+      },
+      {
+        name: "undated.arch",
+        ownerDisplay: "o",
+        registeredAtSlot: 0n,
+        listing: { currency: "Arch", price: 3n, listedAtSlot: 0n, listedAt: null },
+      },
+    ];
+
+    expect(newestListings(zeroSlots, 3).map((e) => e.name)).toEqual([
+      "new.arch",
+      "old.arch",
+      "undated.arch",
+    ]);
+  });
 });
