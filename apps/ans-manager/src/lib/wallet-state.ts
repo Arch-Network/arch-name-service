@@ -109,7 +109,7 @@ export type AccountMismatchContext = {
   pinnedShort: string;
   /** Short form of the account the wallet is offering now. */
   currentShort: string;
-  /** `external` / `watch` when the current account cannot sign at all. */
+  /** `watch` when the current account cannot sign at all. */
   currentKind?: string;
   /** Short form of the key that actually produced the signature, if known. */
   signerShort?: string | null;
@@ -158,7 +158,7 @@ function signerMismatchNotice(
 
 /** Account kinds that cannot produce an Arch message-hash signature. */
 function isUnsignableKind(kind: string | undefined): boolean {
-  return kind === "external" || kind === "watch";
+  return kind === "watch";
 }
 
 /**
@@ -185,17 +185,15 @@ function accountMismatchNotice(
       actionLabel: "Reconnect wallet",
     };
   }
-  // A watch-only or linked external account can't sign, so adopting it
-  // would only move the failure one step later. Say why, and send the
-  // user to the picker.
+  // A watch-only account can't sign, so adopting it would only move the
+  // failure one step later. Say why, and send the user to the picker.
   if (isUnsignableKind(context.currentKind)) {
     return {
       title: "This wallet account can't sign",
       message:
         `This page was set up to pay with ${context.pinnedShort}, but Arch Wallet ` +
-        `is now offering ${context.currentShort}, which is ` +
-        `${context.currentKind === "watch" ? "watch-only" : "a linked external wallet"} ` +
-        `and cannot sign ANS transactions. Nothing was signed and no funds moved. ` +
+        `is now offering ${context.currentShort}, which is watch-only and cannot ` +
+        `sign ANS transactions. Nothing was signed and no funds moved. ` +
         `Reconnect and choose an account the wallet holds keys for, then ` +
         `${retryLabel} again.`,
       action: "reconnect",
@@ -264,10 +262,9 @@ export function walletBlockerNotice(
       return {
         title: "This wallet account can't sign",
         message:
-          "Signing an ANS update needs an Arch Wallet account the extension holds " +
-          "keys for — one you created with a passkey or an email. Linked external " +
-          "wallets (Xverse, UniSat) and watch-only accounts cannot sign these " +
-          `transactions yet. Reconnect, choose one of those accounts, then ` +
+          "Signing an ANS update needs an Arch Wallet account that can produce a " +
+          "signature — passkey, email, or a linked Xverse / UniSat wallet. " +
+          `Watch-only accounts cannot sign. Reconnect, choose a signing account, then ` +
           `${retryLabel} again.`,
         action: "reconnect",
         actionLabel: "Reconnect wallet",

@@ -249,8 +249,8 @@ export function WalletPicker({
           </p>
         )}
         <p className="wallet-picker-note">
-          Linked external accounts inside Arch Wallet still cannot sign ANS
-          message hashes — connect that Bitcoin wallet here instead.
+          Linked Xverse or UniSat accounts inside Arch Wallet can sign ANS
+          updates — Approve in Arch Wallet, then confirm in that Bitcoin wallet.
         </p>
       </div>
     </div>
