@@ -81,13 +81,15 @@ describe("probeWalletStatus", () => {
     expect(status.state).toBe("connected");
   });
 
-  it("separates accounts that cannot sign from ones that can", async () => {
-    for (const kind of ["watch", "external"]) {
-      __resetWalletGateway();
-      installProvider({ getAccount: async () => ({ ...TURNKEY, kind }) });
-      const status = await probeWalletStatus();
-      expect(status.state).toBe("unsupported_account");
-    }
+  it("separates watch-only accounts that cannot sign from ones that can", async () => {
+    installProvider({ getAccount: async () => ({ ...TURNKEY, kind: "watch" }) });
+    const watchStatus = await probeWalletStatus();
+    expect(watchStatus.state).toBe("unsupported_account");
+
+    __resetWalletGateway();
+    installProvider({ getAccount: async () => ({ ...TURNKEY, kind: "external" }) });
+    const externalStatus = await probeWalletStatus();
+    expect(externalStatus.state).toBe("connected");
   });
 
   it("reports locked, and produces no account, when the wallet is locked", async () => {

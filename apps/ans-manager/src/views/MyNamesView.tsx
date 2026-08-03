@@ -112,7 +112,7 @@ export function MyNamesView() {
   const [loading, setLoading] = useState(false);
   const autoLoadedAccount = useRef<string | null>(null);
   // Reading ownership needs an account to read *about*, not one that can
-  // sign. A watch-only or linked-external account cannot mutate anything
+  // sign. A watch-only account cannot mutate anything
   // and used to block this page outright, which showed the user no names
   // for a reason that has nothing to do with names.
   const canRead = reportedAccount !== null;

@@ -678,8 +678,8 @@ export class UnsupportedWalletKindError extends Error {
   constructor(readonly kind: string) {
     super(
       kind === "watch"
-        ? "Watch-only wallets cannot sign ANS updates. Switch to a Turnkey Arch Wallet account (passkey or email)."
-        : "Linked external wallets cannot sign ANS updates yet. Use a Turnkey Arch Wallet account (passkey or email).",
+        ? "Watch-only wallets cannot sign ANS updates. Switch to an account Arch Wallet holds keys for."
+        : `This wallet account kind (${kind}) cannot sign ANS updates.`,
     );
     this.name = "UnsupportedWalletKindError";
   }
@@ -902,9 +902,8 @@ export async function adoptCurrentArchAccount(): Promise<ConnectedArchAccount> {
  * would force the user through a wallet approval they already gave.
  *
  * We only disconnect when there is nothing usable to adopt: no account at
- * all (revoked site), or one that can't sign ANS transactions (watch-only /
- * linked external). Then the reconnect prompt is the point — it's how the
- * user picks a Turnkey account instead.
+ * all (revoked site), or a watch-only account that cannot sign. Then the
+ * reconnect prompt is the point — it's how the user picks a signing account.
  */
 export async function reconnectArchWallet(): Promise<ConnectedArchAccount> {
   const provider = window.arch;
@@ -1255,8 +1254,9 @@ export function formatAnsMutationError(error: unknown): string {
   }
   if (isLinkedExternalSigningError(error)) {
     return (
-      "Linked external wallets cannot sign ANS updates yet. " +
-      "Use a Turnkey-backed Arch Wallet account (passkey or email)."
+      "Arch Wallet could not finish signing with the linked external wallet. " +
+      "Confirm the prompt in Xverse or UniSat, or switch to another Arch Wallet " +
+      "account and try again."
     );
   }
   if (isSignatureMismatchError(error)) {

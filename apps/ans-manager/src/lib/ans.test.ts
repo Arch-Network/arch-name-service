@@ -213,11 +213,9 @@ describe("ans manager helpers", () => {
     expect(err.message).toMatch(/nothing was submitted/i);
   });
 
-  it("blocks linked-external / watch accounts before signing when kind is known", () => {
-    expect(() => assertAnsSigningSupported({ kind: "external" })).toThrow(
-      UnsupportedWalletKindError,
-    );
+  it("blocks watch-only accounts before signing when kind is known", () => {
     expect(() => assertAnsSigningSupported({ kind: "watch" })).toThrow(UnsupportedWalletKindError);
+    expect(() => assertAnsSigningSupported({ kind: "external" })).not.toThrow();
     expect(() => assertAnsSigningSupported({ kind: "turnkey" })).not.toThrow();
     expect(() => assertAnsSigningSupported({})).not.toThrow();
   });

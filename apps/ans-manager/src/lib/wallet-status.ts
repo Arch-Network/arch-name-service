@@ -128,14 +128,14 @@ export class SiteNotConnectedError extends Error {
 /**
  * Account kinds that cannot produce an Arch message-hash signature.
  *
- * Unknown (`undefined`) is treated as signable on purpose: the released
- * extension does not report `kind`, and blocking on a field it never
- * sends would make registration impossible for everyone. If such an
- * account really cannot sign, the wallet says so at signing time and the
- * failure copy takes over.
+ * Unknown (`undefined`) is treated as signable on purpose: older
+ * extensions do not report `kind`, and blocking on a field they never
+ * send would make registration impossible. Watch-only accounts still
+ * cannot sign. Linked external (Xverse / UniSat) accounts can: Arch
+ * Wallet BIP-322-signs through the source wallet.
  */
 export function isSignableAccount(account: { kind?: string }): boolean {
-  return account.kind !== "external" && account.kind !== "watch";
+  return account.kind !== "watch";
 }
 
 export function normalizeAccount(
@@ -577,9 +577,8 @@ export function walletStatusCta(status: WalletStatus): WalletStatusCta | null {
         label: "Switch account",
         title: "This wallet account can't sign",
         message:
-          "Arch Wallet is offering a watch-only or linked external account, which " +
-          "cannot sign ANS transactions. Reconnect and choose an account the " +
-          "extension holds keys for.",
+          "Arch Wallet is offering a watch-only account, which cannot sign ANS " +
+          "transactions. Reconnect and choose an account the extension holds keys for.",
       };
     case "unavailable":
       return {
