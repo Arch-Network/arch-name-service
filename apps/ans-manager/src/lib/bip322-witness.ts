@@ -7,7 +7,7 @@
  * hex); ANS's runner and local verifier need the inner 64-byte (r||s) hex.
  */
 
-import { SignatureUtil } from "@saturnbtcio/arch-sdk";
+import { SignatureUtil } from "@arch-network/arch-sdk";
 
 function decodeBase64(input: string): Uint8Array {
   const str = atob(input);

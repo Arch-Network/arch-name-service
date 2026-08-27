@@ -227,7 +227,7 @@ export async function createArchAccountWithFaucet(
     );
   }
 
-  const { SanitizedMessageUtil, SignatureUtil } = await import("@saturnbtcio/arch-sdk");
+  const { SanitizedMessageUtil, SignatureUtil } = await import("@arch-network/arch-sdk");
   const message = body.result.message as {
     header: unknown;
     account_keys: number[][];

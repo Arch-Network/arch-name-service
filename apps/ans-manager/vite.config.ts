@@ -43,7 +43,7 @@ export default defineConfig({
     alias: {
       buffer: "buffer/",
     },
-    dedupe: ["react", "react-dom", "@omnisat/lasereyes", "buffer", "@saturnbtcio/arch-sdk"],
+    dedupe: ["react", "react-dom", "@omnisat/lasereyes", "buffer", "@arch-network/arch-sdk"],
   },
   optimizeDeps: {
     include: ["buffer", "@arch-network/wallet-connect-kit", "@omnisat/lasereyes"],

@@ -1,4 +1,4 @@
-import { SanitizedMessageUtil } from "@saturnbtcio/arch-sdk";
+import { SanitizedMessageUtil } from "@arch-network/arch-sdk";
 
 import { normalizeRuntimeTransaction } from "../transport/arch-rpc.js";
 import type { AnsTransport } from "../transport/types.js";

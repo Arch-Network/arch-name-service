@@ -11,7 +11,7 @@ import {
   setActiveAnsWalletPort,
 } from "./ans-wallet-session";
 
-vi.mock("@saturnbtcio/arch-sdk", () => ({
+vi.mock("@arch-network/arch-sdk", () => ({
   SignatureUtil: {
     adjustSignature: (sig: Uint8Array) => sig,
   },

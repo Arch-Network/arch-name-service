@@ -3,7 +3,7 @@
  * makeSwapSigner, without a hard dependency on that package.
  */
 
-import { SignatureUtil } from "@saturnbtcio/arch-sdk";
+import { SignatureUtil } from "@arch-network/arch-sdk";
 
 export interface AnsWalletSigner {
   signArchMessageHash(opts: {

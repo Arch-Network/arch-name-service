@@ -1,3 +1,4 @@
+mod elf_upload;
 mod idl;
 mod smoke;
 mod tx;
@@ -12,10 +13,11 @@ use ans_protocol::{
 use anyhow::{bail, Context, Result};
 use arch_program::bitcoin::Network;
 use arch_program::{account::AccountMeta, instruction::Instruction, pubkey::Pubkey};
-use arch_sdk::{with_secret_key_file, ArchRpcClient, Config, ProgramDeployer};
+use arch_sdk::{with_secret_key_file, ArchRpcClient, Config};
 use borsh::to_vec;
 use serde::Serialize;
 
+use elf_upload::deploy_program_elf;
 use smoke::{run_smoke, SmokeReport};
 use tx::send_and_confirm;
 
@@ -161,14 +163,16 @@ fn main() -> Result<()> {
                 if !Path::new(&elf_path).is_file() {
                     bail!("SBF ELF not found at {elf_path}");
                 }
-                ProgramDeployer::new(&config)
-                    .try_deploy_program(
-                        "ans-registry".to_owned(),
-                        program_keypair,
-                        deployer_keypair,
-                        &elf_path,
-                    )
-                    .context("deploy ANS registry program")?;
+                // Stock ProgramDeployer chunks for a 10 KiB tx limit; wiped
+                // Arch testnet enforces 1232 bytes. Use the size-aware uploader.
+                deploy_program_elf(
+                    &config,
+                    "ans-registry",
+                    program_keypair,
+                    deployer_keypair,
+                    Path::new(&elf_path),
+                )
+                .context("deploy ANS registry program")?;
                 deployment.program_deployed = client
                     .read_account_info(program_id)
                     .map(|account| account.is_executable)

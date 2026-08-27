@@ -1,6 +1,6 @@
 {
   "name": "@arch-network/ans-sdk",
-  "version": "0.1.0-testnet.4",
+  "version": "0.1.0-testnet.6",
   "description": "TypeScript SDK for Arch Name Service resolution and mutations",
   "publishConfig": {
     "access": "public",
@@ -28,8 +28,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@arch-network/arch-sdk": "^0.0.28",
     "@noble/hashes": "^1.8.0",
-    "@saturnbtcio/arch-sdk": "^0.0.24",
     "bech32": "^2.0.0"
   },
   "devDependencies": {

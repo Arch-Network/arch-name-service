@@ -5,7 +5,7 @@ import {
   getWalletWitnessSignatureItem,
 } from "./bip322-witness";
 
-vi.mock("@saturnbtcio/arch-sdk", () => ({
+vi.mock("@arch-network/arch-sdk", () => ({
   SignatureUtil: {
     adjustSignature: (sig: Uint8Array) => {
       if (sig.length === 65) return sig.slice(0, 64);

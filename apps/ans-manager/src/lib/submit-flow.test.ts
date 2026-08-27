@@ -30,7 +30,7 @@ const transport = {
   getBestBlockHash: vi.fn(),
 };
 
-vi.mock("@saturnbtcio/arch-sdk", () => ({
+vi.mock("@arch-network/arch-sdk", () => ({
   SanitizedMessageUtil: {
     hash: () => new TextEncoder().encode(MESSAGE_HASH_HEX),
   },
