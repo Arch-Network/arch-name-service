@@ -6,7 +6,7 @@ import type { WalletKitConfig } from "@arch-network/wallet-connect-kit";
  */
 export const ANS_WALLET_KIT_CONFIG: WalletKitConfig = {
   network: "testnet4",
-  appName: "Arch Name Service",
+  appName: "Arch ID",
   storagePrefix: "ans",
   debug: false,
 };

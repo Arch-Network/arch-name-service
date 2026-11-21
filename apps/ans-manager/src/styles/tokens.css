@@ -1,55 +1,72 @@
+/* Arch Prime-aligned design tokens for Arch ID (id.arch.network).
+   Colors, type, and radii mirror apps/web-v2 in Arch-Network/arch-prime. */
+
 @font-face {
-  font-family: "Newsreader";
-  src: url("/fonts/newsreader.woff2") format("woff2");
+  font-family: "Inter Tight";
+  src: url("/fonts/inter-tight-latin.woff2") format("woff2");
   font-weight: 400 700;
+  font-style: normal;
   font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: "Hanken Grotesk";
-  src: url("/fonts/hanken-grotesk.woff2") format("woff2");
-  font-weight: 400 800;
+  font-family: "Inter Tight";
+  src: url("/fonts/inter-tight-latin-ext.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
   font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
-  font-family: "JetBrains Mono";
-  src: url("/fonts/jetbrains-mono.woff2") format("woff2");
-  font-weight: 400 500;
+  font-family: "Inter";
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
   font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter-latin-ext.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 :root {
   color-scheme: light;
-  --color-primary: #e8590c;
-  --color-primary-hover: #cf4f0a;
-  --color-primary-tint: #fcefe7;
-  --color-primary-border: #f3c3a8;
-  --color-positive: #16a34a;
-  --color-negative: #dc2626;
-  --color-warning: #9a6700;
-  --color-info: #3b82f6;
-  --surface-app: #eeeef0;
+  --color-primary: #ff5e00;
+  --color-primary-hover: #e85500;
+  --color-primary-tint: rgba(255, 94, 0, 0.1);
+  --color-primary-border: rgba(255, 94, 0, 0.28);
+  --color-positive: #10a255;
+  --color-negative: #e5484d;
+  --color-warning: #d97706;
+  --color-info: #2a78d6;
+  --surface-app: #f7f7f8;
   --surface-card: #ffffff;
-  --surface-header: #ffffff;
-  --surface-subtle: #f1f1f3;
-  --surface-input: #f4f4f6;
-  --surface-warning: #fff9e8;
-  --surface-negative: #fff1f1;
-  --surface-positive: #effbf3;
-  --text-primary: #16161a;
-  --text-secondary: #6e6e76;
-  --text-muted: #9a9aa2;
-  --text-placeholder: #b0b0b8;
-  --text-mono: #3a3a40;
-  --border-card: #e5e5e8;
-  --border-field: #e0e0e4;
-  --border-divider: #ececef;
+  --surface-header: color-mix(in srgb, #ffffff 82%, transparent);
+  --surface-subtle: rgba(0, 0, 0, 0.045);
+  --surface-input: rgba(0, 0, 0, 0.045);
+  --surface-warning: rgba(217, 119, 6, 0.12);
+  --surface-negative: rgba(229, 72, 77, 0.1);
+  --surface-positive: rgba(16, 162, 85, 0.1);
+  --text-primary: rgba(0, 0, 0, 0.92);
+  --text-secondary: rgba(0, 0, 0, 0.58);
+  --text-muted: rgba(0, 0, 0, 0.38);
+  --text-placeholder: rgba(0, 0, 0, 0.38);
+  --text-mono: rgba(0, 0, 0, 0.72);
+  --border-card: rgba(0, 0, 0, 0.08);
+  --border-field: rgba(0, 0, 0, 0.14);
+  --border-divider: rgba(0, 0, 0, 0.08);
   --radius-pill: 999px;
-  --radius-card: 16px;
+  --radius-card: 18px;
   --radius-field: 12px;
   --radius-input: 12px;
-  --radius-chip: 8px;
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-input: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --radius-chip: 10px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --shadow-input: none;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -58,49 +75,64 @@
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
-  --font-display: "Newsreader", Georgia, serif;
-  --font-body: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", monospace;
+  --font-display: "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --app-atmosphere:
+    radial-gradient(1200px 640px at 12% -8%, rgba(255, 94, 0, 0.08), transparent 58%),
+    radial-gradient(900px 520px at 92% 4%, rgba(0, 0, 0, 0.035), transparent 55%),
+    var(--surface-app);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --color-primary: #f2640f;
+  --color-primary: #ff5e00;
   --color-primary-hover: #ff7a2e;
-  --color-primary-tint: #2a1a10;
-  --color-primary-border: #6b3216;
-  --color-warning: #d6ad55;
-  --surface-app: #0d0d0f;
-  --surface-card: #16161a;
-  --surface-header: #121214;
-  --surface-subtle: #1c1c20;
-  --surface-input: #1c1c20;
-  --surface-warning: #211d11;
-  --surface-negative: #251416;
-  --surface-positive: #102117;
-  --text-primary: #f3f2ee;
-  --text-secondary: #8a8a92;
-  --text-muted: #6e6e76;
-  --text-placeholder: #6e6e76;
-  --text-mono: #c9c9cf;
-  --border-card: #26262b;
-  --border-field: #2a2a30;
-  --border-divider: #232328;
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.25);
-  --shadow-input: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --color-primary-tint: rgba(255, 94, 0, 0.16);
+  --color-primary-border: rgba(255, 94, 0, 0.35);
+  --color-positive: #34d17c;
+  --color-negative: #ff6369;
+  --color-warning: #f5a524;
+  --surface-app: #070708;
+  --surface-card: rgba(255, 255, 255, 0.07);
+  --surface-header: color-mix(in srgb, #000000 82%, transparent);
+  --surface-subtle: rgba(255, 255, 255, 0.05);
+  --surface-input: rgba(255, 255, 255, 0.05);
+  --surface-warning: rgba(245, 165, 36, 0.14);
+  --surface-negative: rgba(255, 99, 105, 0.13);
+  --surface-positive: rgba(52, 209, 124, 0.12);
+  --text-primary: rgba(255, 255, 255, 0.95);
+  --text-secondary: rgba(255, 255, 255, 0.62);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --text-placeholder: rgba(255, 255, 255, 0.4);
+  --text-mono: rgba(255, 255, 255, 0.78);
+  --border-card: rgba(255, 255, 255, 0.075);
+  --border-field: rgba(255, 255, 255, 0.14);
+  --border-divider: rgba(255, 255, 255, 0.075);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-input: none;
+  --app-atmosphere:
+    radial-gradient(1100px 620px at 10% -10%, rgba(255, 94, 0, 0.14), transparent 55%),
+    radial-gradient(800px 480px at 100% 0%, rgba(255, 255, 255, 0.04), transparent 50%),
+    var(--surface-app);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { min-height: 100%; }
 body {
   font-family: var(--font-body);
-  background: var(--surface-app);
+  background: var(--app-atmosphere);
+  background-attachment: fixed;
   color: var(--text-primary);
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 a { color: inherit; text-decoration: none; }
 button, input, select { font: inherit; }
 button, a, input, select, summary { outline-offset: 3px; }
-:focus-visible { outline: 2px solid var(--color-primary); }
-.mono { font-family: var(--font-mono); }
+:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); letter-spacing: 0; }

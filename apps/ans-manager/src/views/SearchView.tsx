@@ -183,10 +183,9 @@ export function SearchView() {
   return (
     <section className="page-section page-section-wide discover-page">
       <div className="hero">
-        <p className="eyebrow">Arch Name Service</p>
-        <h1 className="page-title hero-title">Your name on Arch</h1>
+        <h1 className="page-title hero-title">Arch ID</h1>
         <p className="page-subtitle hero-copy">
-          Replace long wallet addresses with a memorable .arch identity. Search any name to get started.
+          Search the registry, claim a .arch name, and point it at your Arch address.
         </p>
       </div>
       <form className="card search-form" onSubmit={(e) => void onSearch(e)}>
@@ -272,7 +271,6 @@ export function SearchView() {
       <div className="card recent-names" aria-live="polite">
         <div className="recent-names-header">
           <div>
-            <p className="eyebrow">On-chain</p>
             <h2 className="card-title">Latest registrations</h2>
           </div>
           <div className="recent-names-actions">
@@ -324,34 +322,6 @@ export function SearchView() {
           </ul>
         )}
       </div>
-
-      <div className="benefit-grid" aria-label="What you can do with an Arch name">
-        <article className="benefit-card">
-          <span className="benefit-number">01</span>
-          <h2>Share one identity</h2>
-          <p>Use a readable name instead of a long Arch wallet address.</p>
-        </article>
-        <article className="benefit-card">
-          <span className="benefit-number">02</span>
-          <h2>Resolve with confidence</h2>
-          <p>Records are checked against on-chain state before they are shown.</p>
-        </article>
-        <article className="benefit-card">
-          <span className="benefit-number">03</span>
-          <h2>Keep it permanently</h2>
-          <p>Testnet registrations are free and do not expire.</p>
-        </article>
-      </div>
-      <aside className="technical-proof">
-        <div>
-          <p className="eyebrow">Built for verification</p>
-          <h2>Trust the chain, not an indexer.</h2>
-        </div>
-        <p>
-          ANS validates resolution predicates locally against Arch testnet state. Indexers help find
-          names, but they are never the source of truth.
-        </p>
-      </aside>
     </section>
   );
 }
