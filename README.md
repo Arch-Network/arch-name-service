@@ -24,7 +24,7 @@ The implementation contract is specified in [docs/PROTOCOL.md](docs/PROTOCOL.md)
 1. Implement deterministic derivation, state codecs, and pure validation tests.
 2. Implement the registry program and testnet integration suite.
 3. Release testnet client/CLI and operate through expiry and transfer scenarios.
-4. Complete audit, mainnet readiness review, and deploy under a separately approved mainnet configuration.
+4. Complete audit, mainnet readiness review, and deploy under a separately approved mainnet configuration ([docs/MAINNET_DEPLOYMENT.md](docs/MAINNET_DEPLOYMENT.md)).
 
 ## Status
 

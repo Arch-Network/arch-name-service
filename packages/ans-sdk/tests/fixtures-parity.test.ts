@@ -23,6 +23,7 @@ import {
   encodeReverseAccount,
   encodeTaprootAddress,
   hexToBytes,
+  MAINNET_MANIFEST,
   loadTestnetManifest,
   nameHash,
   resolveOwner,
@@ -211,5 +212,9 @@ describe("Rust fixture parity", () => {
   it("validates the frozen testnet manifest PDA", () => {
     const manifest = loadTestnetManifest();
     expect(() => assertManifestConsistency(manifest)).not.toThrow();
+  });
+
+  it("refuses the unset mainnet placeholder until deploy IDs are recorded", () => {
+    expect(() => assertManifestConsistency(MAINNET_MANIFEST)).toThrow(/unset/);
   });
 });
