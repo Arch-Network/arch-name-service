@@ -72,4 +72,7 @@ GitHub Environment `ans-manager` secrets are set for CI deploys.
 
 ## Mainnet
 
-Mainnet remains disabled in SDK/manager/wallet until a separately approved mainnet freeze, audit, and smoke gate.
+Mainnet deploy is gated behind the `ans-mainnet-deploy` workflow and the
+`mainnet` GitHub Environment. Record live program IDs into
+`packages/ans-sdk/manifests/mainnet.json` after smoke; see
+[docs/MAINNET_DEPLOYMENT.md](../docs/MAINNET_DEPLOYMENT.md).

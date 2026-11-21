@@ -4,7 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Testnet registry program for Arch Name Service"
+description = "Registry program for Arch Name Service (.arch testnet + mainnet)"
 
 [lib]
 crate-type = ["cdylib", "lib"]

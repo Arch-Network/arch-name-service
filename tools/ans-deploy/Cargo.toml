@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/Arch-Network/arch-name-service"
-description = "Deploys the ANS registry program to Arch testnet"
+description = "Deploys the ANS registry program to Arch testnet or mainnet"
 
 [[bin]]
 name = "ans-deploy"

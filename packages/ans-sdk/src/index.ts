@@ -9,10 +9,13 @@ export {
 export { AnsClient, selectRecentNames, type NameAvailabilityResult } from "./client/ans-client.js";
 export {
   assertManifestConsistency,
+  loadMainnetManifest,
+  loadManifest,
   loadTestnetManifest,
   programIdBytes,
   registryConfigBytes,
 } from "./config/manifest.js";
+export { MAINNET_MANIFEST } from "./config/mainnet.js";
 export { TESTNET_MANIFEST } from "./config/testnet.js";
 export {
   decodeInstruction,

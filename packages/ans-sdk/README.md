@@ -41,4 +41,7 @@ cargo run -p ans-fixtures -- packages/ans-sdk/fixtures
 cd packages/ans-sdk && npm test
 ```
 
-Mainnet is intentionally disabled until a separately approved mainnet freeze.
+Mainnet manifests are supported after a successful `ans-mainnet-deploy` records
+the live program id into `manifests/mainnet.json`. Until then,
+`loadMainnetManifest()` refuses all-zero placeholders. See
+`docs/MAINNET_DEPLOYMENT.md`.

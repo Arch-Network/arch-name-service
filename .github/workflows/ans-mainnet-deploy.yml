@@ -1,0 +1,125 @@
+name: ans-mainnet-deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Inspect, deploy/upgrade, initialize, publish IDL, or smoke-test the mainnet registry"
+        type: choice
+        required: true
+        default: preflight
+        options: [preflight, deploy, upgrade, initialize, publish-idl, smoke]
+      dry_run:
+        description: "Print the deployment manifest without sending transactions"
+        type: boolean
+        required: true
+        default: true
+      confirm_mainnet_smoke:
+        description: "Required for operation=smoke on mainnet (writes real .arch names)"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ans-mainnet-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: mainnet
+    env:
+      NETWORK: mainnet
+      DRY_RUN: ${{ inputs.dry_run }}
+      CI_ARCH_RPC_URL: ${{ secrets.ARCH_RPC_URL }}
+      CONFIRM_MAINNET_SMOKE: ${{ inputs.confirm_mainnet_smoke && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Decode mainnet keypairs
+        env:
+          PROGRAM_KEYPAIR_B64: ${{ secrets.PROGRAM_KEYPAIR_B64 }}
+          DEPLOYER_KEYPAIR_B64: ${{ secrets.DEPLOYER_KEYPAIR_B64 }}
+          NAMESPACE_AUTHORITY_KEYPAIR_B64: ${{ secrets.NAMESPACE_AUTHORITY_KEYPAIR_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          KEYS="$RUNNER_TEMP/ans-keys"
+          mkdir -p "$KEYS"
+          for secret in PROGRAM_KEYPAIR_B64 DEPLOYER_KEYPAIR_B64 NAMESPACE_AUTHORITY_KEYPAIR_B64; do
+            if [ -z "${!secret:-}" ]; then
+              echo "::error::Missing $secret on the mainnet GitHub Environment." >&2
+              exit 1
+            fi
+          done
+          printf '%s' "$PROGRAM_KEYPAIR_B64" | base64 -d > "$KEYS/program.json"
+          printf '%s' "$DEPLOYER_KEYPAIR_B64" | base64 -d > "$KEYS/deployer.json"
+          printf '%s' "$NAMESPACE_AUTHORITY_KEYPAIR_B64" | base64 -d > "$KEYS/namespace-authority.json"
+          {
+            echo "PROGRAM_KEY_PATH=$KEYS/program.json"
+            echo "DEPLOYER_KEY_PATH=$KEYS/deployer.json"
+            echo "NAMESPACE_AUTHORITY_KEY_PATH=$KEYS/namespace-authority.json"
+            echo "ARCH_RPC_URL=${CI_ARCH_RPC_URL:-https://rpc.mainnet.arch.network}"
+            echo "OUTPUT_PATH=deployments/mainnet.json"
+          } >> "$GITHUB_ENV"
+
+      - name: Build deploy tool
+        run: cargo build --locked -q --manifest-path tools/ans-deploy/Cargo.toml
+
+      - name: Build SBF program
+        if: ${{ inputs.dry_run == false && (inputs.operation == 'deploy' || inputs.operation == 'upgrade') }}
+        run: |
+          set -euo pipefail
+          curl -sSfL https://release.anza.xyz/stable/install | sh
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-multilib
+          MULTIARCH="$(gcc -print-multiarch 2>/dev/null || echo x86_64-linux-gnu)"
+          export CFLAGS="-I/usr/include/${MULTIARCH}${CFLAGS:+ $CFLAGS}"
+          cd programs/ans-registry
+          cargo-build-sbf --features entrypoint
+          test -f ../../target/deploy/ans_registry.so
+
+      - name: Refuse faucet fund on mainnet
+        if: ${{ inputs.operation == 'fund' }}
+        run: |
+          echo "::error::fund is not available on mainnet; fund payers manually, then run preflight." >&2
+          exit 2
+
+      - name: Run ANS mainnet operation
+        run: |
+          set -euo pipefail
+          mkdir -p deployments
+          case "${{ inputs.operation }}" in
+            preflight|initialize|smoke|publish-idl)
+              ACTION="${{ inputs.operation }}"
+              ;;
+            deploy|upgrade)
+              ACTION="deploy"
+              ;;
+            *)
+              echo "::error::unsupported operation" >&2
+              exit 2
+              ;;
+          esac
+          if [ "$DRY_RUN" = "true" ]; then
+            tools/ans-deploy/target/debug/ans-deploy "$ACTION" --dry-run
+          else
+            tools/ans-deploy/target/debug/ans-deploy "$ACTION"
+          fi
+
+      - name: Upload deployment manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ans-${{ inputs.operation }}-mainnet
+          path: deployments/mainnet.json
+          if-no-files-found: warn

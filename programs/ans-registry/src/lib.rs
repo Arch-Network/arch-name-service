@@ -1,4 +1,4 @@
-//! Minimal permanent-registration registry for the ANS testnet alpha.
+//! Permanent-registration registry for the ANS `.arch` namespace (testnet + mainnet).
 
 use ans_protocol::{
     derive::{
@@ -32,7 +32,10 @@ mod transition;
 #[cfg(test)]
 mod transition_tests;
 
-const TESTNET_NAMESPACE: &str = ".arch";
+const ARCH_NAMESPACE: &str = ".arch";
+/// Arch mainnet deployment id for the `.arch` namespace.
+const MAINNET_NETWORK_ID: u32 = 1;
+/// Arch testnet deployment id for the `.arch` namespace.
 const TESTNET_NETWORK_ID: u32 = 2;
 /// Arch Token program (`TokenT4em53UrV4gSvZ3nCS2mZeHaqTLapwt6iZt6Mk`).
 const TOKEN_PROGRAM_ID_BYTES: [u8; 32] = [
@@ -45,6 +48,39 @@ const TESTNET_ABTC_MINT: [u8; 32] = [
     0x22, 0x77, 0xb6, 0x25, 0xb0, 0x9d, 0xe8, 0x18, 0x18, 0xf5, 0xf3, 0xa5, 0x79, 0x89, 0xf1, 0xf1,
 ];
 const SPL_TOKEN_TRANSFER_TAG: u8 = 3;
+
+/// Bitcoin policy + mainnet gate for a supported ANS `network_id`.
+fn network_policy(network_id: u32) -> Result<(BitcoinNetwork, bool), ProgramError> {
+    match network_id {
+        MAINNET_NETWORK_ID => Ok((BitcoinNetwork::Mainnet, true)),
+        TESTNET_NETWORK_ID => Ok((BitcoinNetwork::Testnet, false)),
+        _ => Err(ProgramError::InvalidInstructionData),
+    }
+}
+
+fn supported_network_id(network_id: u32) -> bool {
+    network_id == MAINNET_NETWORK_ID || network_id == TESTNET_NETWORK_ID
+}
+
+/// aBTC mint allowed for BTC marketplace quotes on this registry.
+/// Mainnet BTC quotes stay disabled until a mainnet mint is wired in.
+fn expected_abtc_mint(config: &RegistryConfig) -> Result<[u8; 32], ProgramError> {
+    match config.network_id {
+        TESTNET_NETWORK_ID => Ok(TESTNET_ABTC_MINT),
+        MAINNET_NETWORK_ID => Err(ProgramError::InvalidInstructionData),
+        _ => Err(ProgramError::InvalidAccountData),
+    }
+}
+
+fn ensure_quote_supported(
+    config: &RegistryConfig,
+    currency: QuoteCurrency,
+) -> Result<(), ProgramError> {
+    match currency {
+        QuoteCurrency::Arch => Ok(()),
+        QuoteCurrency::Btc => expected_abtc_mint(config).map(|_| ()),
+    }
+}
 
 #[cfg(feature = "entrypoint")]
 arch_program::entrypoint!(process_instruction);
@@ -130,35 +166,33 @@ fn initialize_registry(
     network_id: u32,
     namespace_authority: ArchAddress,
 ) -> Result<(), ProgramError> {
-    if network_id != TESTNET_NETWORK_ID {
-        return Err(ProgramError::InvalidInstructionData);
-    }
+    let (bitcoin_network, mainnet_enabled) = network_policy(network_id)?;
     let iterator = &mut accounts.iter();
     let authority = next_account_info(iterator)?;
     let config = next_account_info(iterator)?;
     require_signer(authority)?;
-    let expected = derive_config_address(program_id.serialize(), network_id, TESTNET_NAMESPACE);
+    let expected = derive_config_address(program_id.serialize(), network_id, ARCH_NAMESPACE);
     require_address(config, expected)?;
     let state = RegistryConfig {
         header: AccountHeader::initialized(REGISTRY_CONFIG_DISCRIMINATOR),
         program_version: 1,
         network_id,
-        namespace: TESTNET_NAMESPACE.to_owned(),
+        namespace: ARCH_NAMESPACE.to_owned(),
         namespace_authority,
         grace_period_slots: 0,
         min_registration_slots: 0,
         max_registration_slots: 0,
-        bitcoin_network: BitcoinNetwork::Testnet,
+        bitcoin_network,
         token_programs: Vec::new(),
         paused: false,
-        mainnet_enabled: false,
+        mainnet_enabled,
     };
     if authority.key.serialize() != state.namespace_authority {
         return Err(ProgramError::MissingRequiredSignature);
     }
     let bytes = encode_state(&state);
     let network = network_id.to_le_bytes();
-    let namespace = namespace_hash(TESTNET_NAMESPACE);
+    let namespace = namespace_hash(ARCH_NAMESPACE);
     let seeds = [
         b"ans:config:v1".as_slice(),
         network.as_slice(),
@@ -197,7 +231,7 @@ fn register(
         name_account,
         derive_name_address(program_id.serialize(), &config.namespace, name.name_hash),
     )?;
-    let namespace = namespace_hash(TESTNET_NAMESPACE);
+    let namespace = namespace_hash(ARCH_NAMESPACE);
     let seeds = [
         b"ans:name:v1".as_slice(),
         namespace.as_slice(),
@@ -302,7 +336,7 @@ fn set_record(
     )
     .map_err(|_| ProgramError::InvalidInstructionData)?;
     if existing.is_none() {
-        let namespace = namespace_hash(TESTNET_NAMESPACE);
+        let namespace = namespace_hash(ARCH_NAMESPACE);
         let record_kind = [record_type as u8];
         let key_hash = text_key.map(record_key_hash);
         let bytes = encode_state(&record);
@@ -429,7 +463,7 @@ fn set_primary(
     if reverse_account.owner == program_id {
         // Existing reverse PDA (or prior underfunded create).
     } else if reverse_account.data_is_empty() {
-        let namespace = namespace_hash(TESTNET_NAMESPACE);
+        let namespace = namespace_hash(ARCH_NAMESPACE);
         let seeds = [
             b"ans:reverse:v1".as_slice(),
             namespace.as_slice(),
@@ -482,6 +516,7 @@ fn list_name(
     require_signer(seller)?;
     let config = load_config(program_id, config_account)?;
     ensure_unpaused(&config)?;
+    ensure_quote_supported(&config, currency)?;
     let name = load_name(program_id, name_account, &config, name_hash)?;
     require_owner(seller, &name.owner)?;
     let listing_address =
@@ -492,7 +527,7 @@ fn list_name(
     }
     let listing = marketplace::create_listing(name_hash, name.owner, currency, price);
     let bytes = encode_state(&listing);
-    let namespace = namespace_hash(TESTNET_NAMESPACE);
+    let namespace = namespace_hash(ARCH_NAMESPACE);
     let seeds: [&[u8]; 3] = [b"ans:listing:v1", namespace.as_slice(), name_hash.as_slice()];
     if listing_account.owner == program_id {
         // Re-list into an existing deactivated listing PDA.
@@ -568,7 +603,8 @@ fn buy_name(
             let seller_ata = next_account_info(iterator)?;
             let mint = next_account_info(iterator)?;
             let token_program = next_account_info(iterator)?;
-            if mint.key.serialize() != TESTNET_ABTC_MINT {
+            let expected_mint = expected_abtc_mint(&config)?;
+            if mint.key.serialize() != expected_mint {
                 return Err(ProgramError::InvalidAccountData);
             }
             if token_program.key.serialize() != TOKEN_PROGRAM_ID_BYTES {
@@ -608,6 +644,7 @@ fn make_offer(
     require_signer(buyer)?;
     let config = load_config(program_id, config_account)?;
     ensure_unpaused(&config)?;
+    ensure_quote_supported(&config, currency)?;
     let name = load_name(program_id, name_account, &config, name_hash)?;
     if name.owner == buyer.key.serialize() {
         return Err(ProgramError::InvalidInstructionData);
@@ -624,7 +661,7 @@ fn make_offer(
     }
     let offer = marketplace::create_offer(name_hash, buyer.key.serialize(), currency, price);
     let bytes = encode_state(&offer);
-    let namespace = namespace_hash(TESTNET_NAMESPACE);
+    let namespace = namespace_hash(ARCH_NAMESPACE);
     let buyer_bytes = buyer.key.serialize();
     let seeds: [&[u8]; 4] = [
         b"ans:offer:v1",
@@ -711,7 +748,8 @@ fn accept_offer(
             let seller_ata = next_account_info(iterator)?;
             let mint = next_account_info(iterator)?;
             let token_program = next_account_info(iterator)?;
-            if mint.key.serialize() != TESTNET_ABTC_MINT {
+            let expected_mint = expected_abtc_mint(&config)?;
+            if mint.key.serialize() != expected_mint {
                 return Err(ProgramError::InvalidAccountData);
             }
             if token_program.key.serialize() != TOKEN_PROGRAM_ID_BYTES {
@@ -867,7 +905,11 @@ fn load_config(program_id: &Pubkey, account: &AccountInfo) -> Result<RegistryCon
         .header
         .validate(REGISTRY_CONFIG_DISCRIMINATOR)
         .map_err(|_| ProgramError::InvalidAccountData)?;
-    if config.namespace != TESTNET_NAMESPACE || config.network_id != TESTNET_NETWORK_ID {
+    if config.namespace != ARCH_NAMESPACE || !supported_network_id(config.network_id) {
+        return Err(ProgramError::InvalidAccountData);
+    }
+    let (expected_bitcoin, expected_mainnet) = network_policy(config.network_id)?;
+    if config.bitcoin_network != expected_bitcoin || config.mainnet_enabled != expected_mainnet {
         return Err(ProgramError::InvalidAccountData);
     }
     require_address(

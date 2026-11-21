@@ -125,4 +125,5 @@ step as a separate `workflow_dispatch` run so artifacts stay auditable:
    upgrade as ready for client use.
 
 Mainnet is a separate gated deployment and configuration approval. Testnet
-keys and workflows must not automatically control mainnet.
+keys and workflows must not automatically control mainnet. See
+[MAINNET_DEPLOYMENT.md](MAINNET_DEPLOYMENT.md).
