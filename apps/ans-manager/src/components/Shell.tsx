@@ -1,10 +1,14 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useArchWallet } from "../hooks/useArchWallet";
 import { useWalletRecovery } from "../hooks/useWalletRecovery";
 import { shortArchAddress } from "../lib/arch-identity";
 import { walletCtaDisabled, walletStatusCta } from "../lib/wallet-status";
 import { ExplorerLink } from "./ExplorerLink";
+
+/** Arch Prime glyph path (viewBox 0 0 544 393). */
+const BRAND_GLYPH_D =
+  "M92.3 392.3H5.5C1.2 392.3-1.4 387.6.8 384L226.9 24.7C236.7 9.3 253.5 0 272 0s35.3 9.2 45 24.7L543.1 384c2.3 3.6-.3 8.3-4.7 8.3H451.2c-1.9 0-3.7-1-4.7-2.6L306.3 166.2c-3.7-5.9-8.8-10.6-14.7-13.9-5.9-3.3-12.6-5-19.7-5-14.1 0-26.9 7-34.4 18.9L97 389.8c-1 1.6-2.8 2.5-4.7 2.5Z";
 
 export function Shell() {
   const { status, reportedAccount, connecting, error, openWalletPicker } = useArchWallet();
@@ -45,14 +49,16 @@ export function Shell() {
     <div className="app-shell">
       <header className="topbar">
         <div className="topbar-main">
-          <div className="brand">
-            <img className="brand-swap-light" src="/brand/arch-logo-orange.svg" alt="Arch" />
-            <img className="brand-swap-dark" src="/brand/arch-logo-cream.svg" alt="Arch" />
+          <Link className="brand" to="/" aria-label="Arch ID home">
+            <svg className="brand-glyph" viewBox="0 0 544 393" aria-hidden="true">
+              <path d={BRAND_GLYPH_D} />
+            </svg>
+            <span className="brand-name">Arch ID</span>
             <span className="network-pill">
               <span className="network-dot" aria-hidden />
               Testnet
             </span>
-          </div>
+          </Link>
           <nav className="nav" aria-label="ANS navigation">
             <NavLink to="/" end>Discover</NavLink>
             <NavLink to="/explore">Marketplace</NavLink>
@@ -102,7 +108,12 @@ export function Shell() {
         <Outlet />
       </main>
       <footer className="site-footer">
-        <p>Arch Name Service · Testnet</p>
+        <p>
+          <svg className="footer-glyph" viewBox="0 0 544 393" aria-hidden="true">
+            <path d={BRAND_GLYPH_D} />
+          </svg>
+          Arch ID · Testnet
+        </p>
         <nav aria-label="Support links">
           <a href="https://github.com/Arch-Network/arch-name-service" target="_blank" rel="noreferrer">
             Documentation

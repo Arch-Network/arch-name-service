@@ -223,7 +223,6 @@ export function RegisterView() {
 
   return (
     <section className="page-section">
-      <p className="eyebrow">Create your identity</p>
       <h1 className="page-title">Register a .arch name</h1>
       <p className="page-subtitle">
         Free on testnet. Yours permanently. Review the name, connect when prompted, then approve registration.

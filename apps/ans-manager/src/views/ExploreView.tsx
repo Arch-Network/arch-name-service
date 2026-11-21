@@ -190,10 +190,9 @@ export function ExploreView() {
   return (
     <section className="page-section page-section-wide explore-page">
       <div className="hero explore-hero">
-        <p className="eyebrow">Marketplace</p>
-        <h1 className="page-title hero-title">Explore .arch names</h1>
+        <h1 className="page-title hero-title">Marketplace</h1>
         <p className="page-subtitle hero-copy">
-          Fixed-price listings settle on-chain with ownership transfer.
+          Browse .arch names and buy fixed-price listings settled on-chain.
         </p>
       </div>
 
